@@ -61,7 +61,7 @@ type GroupedRepo struct {
 }
 
 type Registry interface {
-	GetAuth(rg GroupedRepo) string
+	GetAuth(rg GroupedRepo) (string, AuthType)
 	GetUrl() string
 }
 

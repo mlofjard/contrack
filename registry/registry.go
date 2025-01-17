@@ -86,9 +86,9 @@ func FetchTags(config Config, imageTagMap ImageTagMap, domainGroupedRepoMap Doma
 			}
 
 			regUrl := reg.GetUrl()
-			token := reg.GetAuth(groupedRepo)
+			token, regAuthType := reg.GetAuth(groupedRepo)
 			if token != "" {
-				authType = configuredRepo.AuthType
+				authType = regAuthType
 				authToken = token
 			}
 

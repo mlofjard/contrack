@@ -12,11 +12,9 @@ func (r Custom) GetUrl() string {
 	return r.RegistryUrl
 }
 
-func (r Custom) GetAuth(rg GroupedRepo) string {
-	ret := ""
+func (r Custom) GetAuth(rg GroupedRepo) (string, AuthType) {
 	if rg.AuthType != AuthTypes.None {
-		ret = rg.AuthToken
+		return rg.AuthToken, rg.AuthType
 	}
-
-	return ret
+	return "", rg.AuthType
 }

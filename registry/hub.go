@@ -22,7 +22,7 @@ func (r Hub) GetUrl() string {
 	return r.registryUrl
 }
 
-func (r Hub) GetAuth(rg GroupedRepo) string {
+func (r Hub) GetAuth(rg GroupedRepo) (string, AuthType) {
 	client := resty.New().
 		SetHeader("accept", "application/json").
 		SetQueryParam("service", "registry.docker.io").
@@ -51,5 +51,5 @@ func (r Hub) GetAuth(rg GroupedRepo) string {
 	}
 	// fmt.Println("Got auth response", authResponse)
 
-	return authResponse.Token
+	return authResponse.Token, AuthTypes.Bearer
 }
