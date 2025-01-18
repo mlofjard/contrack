@@ -26,6 +26,8 @@ go.work.sum
 
 # binary
 /contrack
+# releases
+/release
 # config
 /config.yaml
 
