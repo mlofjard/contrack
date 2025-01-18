@@ -75,7 +75,6 @@ func main() {
 		trackedContainers = containers.GetContainers(config, repoWithRegistryMap, containers.ContainerFunc)
 	}
 
-	fmt.Println("Main", trackedContainers)
 	// Group containers by repo
 	uniqueImagesCount = containers.GroupContainers(config, domainGroupedRepoMap, repoWithRegistryMap, trackedContainers)
 
