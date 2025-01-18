@@ -15,33 +15,46 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// These are public for marshalling
-type ConfigRegistry struct {
+type configRegistry struct {
 	Domain string  `yaml:"domain"`
 	Auth   *string `yaml:"auth"`
 	Token  *string `yaml:"token"`
 	Url    *string `yaml:"url"`
 }
 
-type ConfigFile struct {
+type configFile struct {
 	Host           *string                   `yaml:"host"`
 	Debug          *bool                     `yaml:"debug"`
 	IncludeStopped *bool                     `yaml:"includeStopped"`
 	NoProgress     *bool                     `yaml:"noProgress"`
-	Registries     map[string]ConfigRegistry `yaml:"registries"`
+	Registries     map[string]configRegistry `yaml:"registries"`
+	Columns        *[]string                 `yaml:"columns"`
 }
 
-func ParseConfigFile(cmdFlags *CommandFlags, domainConfiguredRegistryMap DomainConfiguredRegistryMap) Config {
-	// Create object for unmarshalling our YAML
-	configFile := ConfigFile{Registries: make(map[string]ConfigRegistry)}
-
+func FileReaderFunc(cmdFlags *CommandFlags) []byte {
 	data, err := os.ReadFile(*cmdFlags.ConfigPathPtr)
 	if err != nil {
 		if !errors.Is(err, fs.ErrNotExist) {
 			log.Fatalf("Error reading config file: %v", err)
 		}
 	}
-	err = yaml.Unmarshal([]byte(data), &configFile)
+	return data
+}
+
+func ParseConfigFile(cmdFlags *CommandFlags, domainConfiguredRegistryMap DomainConfiguredRegistryMap, fileReaderFn ConfigFileReaderFn) Config {
+	data := fileReaderFn(cmdFlags)
+	debug := func(a ...any) {
+		if *cmdFlags.DebugPtr {
+			fmt.Print("CONFIG ")
+			fmt.Println(a...)
+		}
+	}
+
+	// Create object for unmarshalling our YAML
+	configFile := configFile{Registries: make(map[string]configRegistry)}
+
+	// Unmarshal YAML data
+	err := yaml.Unmarshal([]byte(data), &configFile)
 	if err != nil {
 		log.Fatalf("Error parsing config file: %v", err)
 	}
@@ -51,20 +64,29 @@ func ParseConfigFile(cmdFlags *CommandFlags, domainConfiguredRegistryMap DomainC
 		Debug:      false,
 		NoProgress: false,
 		Host:       "unix:///var/run/docker/docker.sock",
+		Columns:    []string{"status", "container", "repository", "tag", "update"},
 	}
 
 	// Override from config
 	if configFile.Debug != nil {
+		debug("Found Debug in config file")
 		config.Debug = *configFile.Debug
 	}
 	if configFile.NoProgress != nil {
+		debug("Found NoProgress in config file")
 		config.NoProgress = *configFile.NoProgress
 	}
 	if configFile.Host != nil {
+		debug("Found Host in config file")
 		config.Host = *configFile.Host
 	}
 	if configFile.IncludeStopped != nil {
+		debug("Found IncludeAll in config file")
 		config.IncludeAll = *configFile.IncludeStopped
+	}
+	if configFile.Columns != nil {
+		debug("Found Columns in config file")
+		config.Columns = *configFile.Columns
 	}
 
 	// Override from flags
@@ -78,6 +100,8 @@ func ParseConfigFile(cmdFlags *CommandFlags, domainConfiguredRegistryMap DomainC
 			config.NoProgress = *cmdFlags.NoProgressPtr
 		case "host":
 			config.Host = *cmdFlags.HostPtr
+		case "columns":
+			config.Columns = strings.Split(*cmdFlags.ColumnsPtr, ",")
 		}
 	})
 

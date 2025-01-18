@@ -23,7 +23,7 @@ type tagResponse struct {
 	Tags []string
 }
 
-func FetcherFunc(regUrl string, authType AuthType, authToken string, image string, tags *TagList, last string) int {
+func TagFetcherFunc(regUrl string, authType AuthType, authToken string, image string, tags *TagList, last string) int {
 	status := 200
 	client := resty.New().
 		SetQueryParam("n", "1000").
@@ -57,12 +57,12 @@ func FetcherFunc(regUrl string, authType AuthType, authToken string, image strin
 	tags.Tags = slices.Concat(tags.Tags, newList)
 
 	if resp.Header().Get("link") != "" {
-		status = FetcherFunc(regUrl, authType, authToken, image, tags, lastTag)
+		status = TagFetcherFunc(regUrl, authType, authToken, image, tags, lastTag)
 	}
 	return status
 }
 
-func FetchTags(config Config, imageTagMap ImageTagMap, domainGroupedRepoMap DomainGroupedRepoMap, domainConfiguredRegistryMap DomainConfiguredRegistryMap, imageCount int, fetcherFn FetcherFn) {
+func FetchTags(config Config, imageTagMap ImageTagMap, domainGroupedRepoMap DomainGroupedRepoMap, domainConfiguredRegistryMap DomainConfiguredRegistryMap, imageCount int, fetcherFn RegistryTagFetcherFn) {
 	bar := p.NewOptions(imageCount,
 		p.OptionSetWriter(os.Stdout),
 		p.OptionClearOnFinish(),

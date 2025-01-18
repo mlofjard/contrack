@@ -20,6 +20,10 @@ const version = "0.1.0"
 type multiValueFlags []string
 
 func (i multiValueFlags) Has(s string) bool {
+	all := slices.Contains(i, "all")
+	if all {
+		return true
+	}
 	return slices.Contains(i, s)
 }
 
@@ -29,6 +33,7 @@ func main() {
 		ConfigPathPtr: flag.StringP("config", "f", "config.yaml", "Specify config file path"),
 		DebugPtr:      flag.BoolP("debug", "d", false, "Enable debug output"),
 		MockPtr:       flag.String("mock", "none", "Enable mocks (none, config, containers, registry, all)"),
+		ColumnsPtr:    flag.StringP("columns", "c", "", "Set columns to use for output. See COLUMNSPEC"),
 		HostPtr:       flag.StringP("host", "h", "unix:///var/run/docker/docker.sock", "Set docker/podman host"),
 		IncludeAllPtr: flag.BoolP("include-all", "a", false, "Include stopped containers"),
 		NoProgressPtr: flag.BoolP("no-progress", "n", false, "Hide progress bar"),
@@ -43,6 +48,17 @@ func main() {
 		fmt.Println("Usage: contrack [OPTION]")
 		fmt.Println("\nOptions:")
 		flag.CommandLine.PrintDefaults()
+		fmt.Println("\nCOLUMNSPEC:")
+		fmt.Println("A comma separated line of column names")
+		fmt.Println("  container            The container name")
+		fmt.Println("  status               Short processing status (OK/ERR)")
+		fmt.Println("  detail               Long processing status error explaination")
+		fmt.Println("  repository           Repository (<domain>/<path>)")
+		fmt.Println("  image                Image (<domain>/<path>:<tag>)")
+		fmt.Println("  domain               Image domain")
+		fmt.Println("  path                 Image path")
+		fmt.Println("  tag                  Image tag")
+		fmt.Println("  update               Newer tag found")
 		os.Exit(0)
 	}
 
@@ -56,23 +72,19 @@ func main() {
 		mockFlags = strings.Split(*cmdFlags.MockPtr, ",")
 	}
 
+	configFileReaderFn := map[bool]ConfigFileReaderFn{true: mocks.ConfigFileReaderFunc, false: configuration.FileReaderFunc}[mockFlags.Has("config")]
+	containerDiscoveryFn := map[bool]ContainerDiscoveryFn{true: mocks.ContainerDiscoveryFunc, false: containers.DiscoveryFunc}[mockFlags.Has("containers")]
+	registryTagFetcherFn := map[bool]RegistryTagFetcherFn{true: mocks.RegistryTagFetcherFunc, false: registry.TagFetcherFunc}[mockFlags.Has("registry")]
+
 	// Parse config file to domain -> repo map
 	domainConfiguredRegistryMap := make(DomainConfiguredRegistryMap)
 	var config Config
-	if mockFlags.Has("all") || mockFlags.Has("config") {
-		config = mocks.ParseConfigFile(&cmdFlags, domainConfiguredRegistryMap)
-	} else {
-		config = configuration.ParseConfigFile(&cmdFlags, domainConfiguredRegistryMap)
-	}
+	config = configuration.ParseConfigFile(&cmdFlags, domainConfiguredRegistryMap, configFileReaderFn)
 
 	// Process containers and get domain -> grouped by repo map
 	var trackedContainers TrackedContainers
 	var uniqueImagesCount int
-	if mockFlags.Has("all") || mockFlags.Has("containers") {
-		trackedContainers = containers.GetContainers(config, domainConfiguredRegistryMap, mocks.ContainerFunc)
-	} else {
-		trackedContainers = containers.GetContainers(config, domainConfiguredRegistryMap, containers.ContainerFunc)
-	}
+	trackedContainers = containers.GetContainers(config, domainConfiguredRegistryMap, containerDiscoveryFn)
 
 	// Group containers by repo
 	domainGroupedRepoMap := make(DomainGroupedRepoMap, len(domainConfiguredRegistryMap))
@@ -80,11 +92,7 @@ func main() {
 
 	// Fetch tags for all unique images
 	imageTagMap := make(ImageTagMap, uniqueImagesCount)
-	if mockFlags.Has("all") || mockFlags.Has("registry") {
-		registry.FetchTags(config, imageTagMap, domainGroupedRepoMap, domainConfiguredRegistryMap, uniqueImagesCount, mocks.FetcherFunc)
-	} else {
-		registry.FetchTags(config, imageTagMap, domainGroupedRepoMap, domainConfiguredRegistryMap, uniqueImagesCount, registry.FetcherFunc)
-	}
+	registry.FetchTags(config, imageTagMap, domainGroupedRepoMap, domainConfiguredRegistryMap, uniqueImagesCount, registryTagFetcherFn)
 
 	// Process container image versions and print
 	containers.ProcessTrackedContainers(config, imageTagMap, trackedContainers)

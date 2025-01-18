@@ -5,6 +5,11 @@ host: unix:///run/docker/docker.sock
 includeStopped: false
 # Hide the progress bar (only output table)
 noProgress: false
+# # Columns to show in output
+# # Follows the COLUMNSPEC detailed in `contrack --help`
+# columns:
+#   - status
+#   - image
 # Print debug info
 debug: false
 # Configured registries

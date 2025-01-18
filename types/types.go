@@ -4,6 +4,7 @@ type CommandFlags struct {
 	ConfigPathPtr *string
 	DebugPtr      *bool
 	MockPtr       *string
+	ColumnsPtr    *string
 	HostPtr       *string
 	IncludeAllPtr *bool
 	NoProgressPtr *bool
@@ -28,6 +29,7 @@ type Config struct {
 	IncludeAll bool
 	NoProgress bool
 	Host       string
+	Columns    []string
 }
 type DomainConfiguredRegistryMap = map[string]ConfiguredRegistry
 
@@ -63,9 +65,11 @@ type ContainerLabels struct {
 	Transform string
 }
 
-type ContainerFn = func(Config) []Container
+type ConfigFileReaderFn = func(*CommandFlags) []byte
 
-type FetcherFn = func(string, AuthType, string, string, *TagList, string) int
+type ContainerDiscoveryFn = func(Config) []Container
+
+type RegistryTagFetcherFn = func(string, AuthType, string, string, *TagList, string) int
 
 type GroupedRepository struct {
 	// AuthType  AuthType

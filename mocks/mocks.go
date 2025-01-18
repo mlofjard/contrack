@@ -3,37 +3,25 @@ package mocks
 import (
 	"time"
 
-	"github.com/mlofjard/contrack/registry"
 	. "github.com/mlofjard/contrack/types"
 )
 
-func ParseConfigFile(cmdFlags *CommandFlags, domainConfiguredRegistryMap DomainConfiguredRegistryMap) Config {
-	domainConfiguredRegistryMap["lscr.io"] = ConfiguredRegistry{
-		AuthType:  AuthTypes.None,
-		AuthToken: "",
-		Name:      "lscr",
-		Domain:    "lscr.io",
-		Registry:  registry.DomainRegistryMap["lscr.io"],
-	}
-	domainConfiguredRegistryMap["docker.io"] = ConfiguredRegistry{
-		AuthType:  AuthTypes.None,
-		AuthToken: "",
-		Name:      "hub",
-		Domain:    "docker.io",
-		Registry:  registry.DomainRegistryMap["docker.io"],
-	}
-
-	return Config{
-		Debug:      *cmdFlags.DebugPtr,
-		IncludeAll: *cmdFlags.IncludeAllPtr,
-		NoProgress: *cmdFlags.NoProgressPtr,
-		Host:       *cmdFlags.HostPtr,
-	}
+func ConfigFileReaderFunc(cmdFlags *CommandFlags) []byte {
+	yaml := `
+---
+registries:
+  lscr:
+    domain: lscr.io
+  hub:
+    domain: docker.io
+    
+`
+	return []byte(yaml)
 }
 
 type labelMap = map[string]string
 
-func ContainerFunc(config Config) []Container {
+func ContainerDiscoveryFunc(config Config) []Container {
 	images := []Container{
 		{
 			Name:  "jellyfin-ctr",
@@ -62,7 +50,7 @@ func ContainerFunc(config Config) []Container {
 	return images
 }
 
-func FetcherFunc(regUrl string, authType AuthType, authToken string, image string, tags *TagList, last string) int {
+func RegistryTagFetcherFunc(regUrl string, authType AuthType, authToken string, image string, tags *TagList, last string) int {
 	tags.Tags = []string{
 		"2.0.0ubu2404-ls254",
 		"1.0.0ubu2204-ls22",

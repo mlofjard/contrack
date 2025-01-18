@@ -1,6 +1,6 @@
 # contrack
 
-A small cli tool for fetching the tags for all your containers and telling you if there are any new versions.
+A small CLI tool for fetching the tags for all your containers and telling you if there are any new versions.
 Heavily inspired by [What's Up Docker](https://github.com/getwud/wud) but without the triggers and more manual.
 
 ## Usage
@@ -18,13 +18,26 @@ No really, it's just a command file.
 Usage: contrack [OPTION]
 
 Options:
-  -f, --config string   Specify config file path (default "config.yaml")
-  -d, --debug           Enable debug output
-  -h, --host string     Set docker/podman host (default "unix:///var/run/docker/docker.sock")
-  -a, --include-all     Include stopped containers
-  -n, --no-progress     Hide progress bar
-      --version         Print version information and exit
-      --help            Print Help (this message) and exit
+  -f, --config string    Specify config file path (default "config.yaml")
+  -d, --debug            Enable debug output
+  -c, --columns string   Set columns to use for output. See COLUMNSPEC
+  -h, --host string      Set docker/podman host (default "unix:///var/run/docker/docker.sock")
+  -a, --include-all      Include stopped containers
+  -n, --no-progress      Hide progress bar
+      --version          Print version information and exit
+      --help             Print Help (this message) and exit
+
+COLUMNSPEC:
+A comma separated line of column names
+  container            The container name
+  status               Short processing status (OK/ERR)
+  detail               Long processing status error explaination
+  repository           Repository (<domain>/<path>)
+  image                Image (<domain>/<path>:<tag>)
+  domain               Image domain
+  path                 Image path
+  tag                  Image tag
+  update               Newer tag found
 ```
 
 ## Configuration
@@ -39,6 +52,11 @@ host: unix:///run/docker/docker.sock
 includeStopped: false
 # Hide the progress bar (only output table)
 noProgress: false
+# # Columns to show in output
+# # Follows the COLUMNSPEC detailed in `contrack --help`
+# columns:
+#   - status
+#   - image
 # Print debug info
 debug: false
 # Configured registries
