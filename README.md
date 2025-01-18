@@ -41,8 +41,8 @@ includeStopped: false
 noProgress: false
 # Print debug info
 debug: false
-# Configured repositories
-repositories:
+# Configured registries
+registries:
   hub:
     domain: docker.io
   ghcr:
@@ -51,20 +51,20 @@ repositories:
     domain: lscr.io
     auth: bearer
     token: somesupersecrettoken=
-  # Custom repository
+  # Custom registry
     # [my_custom] is a name that can be anything unique in the list
     # [domain] is the first part used for mathing container images
     #   if the full image name is `docker.io/library/nginx:1.2.3`
     #   then `docker.io` is the domain part.
   #   [auth] can be `basic` or `bearer`. It is used when
     #   authentication is needed for the repo.
-    #   Some repositories have special authorization procedures,
+    #   Some registries have special authorization procedures,
     #   like docker hub. Contrack has built in support for the
     #   procedure that Docker Hub and GHCR uses for its anynomous
     #   access, but everything else just uses the standard
     #   `authorization` header in the HTTP request for tag fetching.
   #   [token] the authorization token to send in the header
-  #   [url] can be defined if your custom repository uses a non V2
+  #   [url] can be defined if your custom registry uses a non V2
     #   standard URL. Otherwise this will be constructed from [domain]
     #   as https://<domain>/v2
   my_custom: # Name, can be anything unique

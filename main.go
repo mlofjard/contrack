@@ -57,33 +57,33 @@ func main() {
 	}
 
 	// Parse config file to domain -> repo map
-	repoWithRegistryMap := make(ConfigRepoWithRegistryMap)
+	domainConfiguredRegistryMap := make(DomainConfiguredRegistryMap)
 	var config Config
 	if mockFlags.Has("all") || mockFlags.Has("config") {
-		config = mocks.ParseConfigFile(&cmdFlags, repoWithRegistryMap)
+		config = mocks.ParseConfigFile(&cmdFlags, domainConfiguredRegistryMap)
 	} else {
-		config = configuration.ParseConfigFile(&cmdFlags, repoWithRegistryMap)
+		config = configuration.ParseConfigFile(&cmdFlags, domainConfiguredRegistryMap)
 	}
 
 	// Process containers and get domain -> grouped by repo map
-	domainGroupedRepoMap := make(DomainGroupedRepoMap, len(repoWithRegistryMap))
 	var trackedContainers TrackedContainers
 	var uniqueImagesCount int
 	if mockFlags.Has("all") || mockFlags.Has("containers") {
-		trackedContainers = containers.GetContainers(config, repoWithRegistryMap, mocks.ContainerFunc)
+		trackedContainers = containers.GetContainers(config, domainConfiguredRegistryMap, mocks.ContainerFunc)
 	} else {
-		trackedContainers = containers.GetContainers(config, repoWithRegistryMap, containers.ContainerFunc)
+		trackedContainers = containers.GetContainers(config, domainConfiguredRegistryMap, containers.ContainerFunc)
 	}
 
 	// Group containers by repo
-	uniqueImagesCount = containers.GroupContainers(config, domainGroupedRepoMap, repoWithRegistryMap, trackedContainers)
+	domainGroupedRepoMap := make(DomainGroupedRepoMap, len(domainConfiguredRegistryMap))
+	uniqueImagesCount = containers.GroupContainers(config, domainGroupedRepoMap, domainConfiguredRegistryMap, trackedContainers)
 
 	// Fetch tags for all unique images
 	imageTagMap := make(ImageTagMap, uniqueImagesCount)
 	if mockFlags.Has("all") || mockFlags.Has("registry") {
-		registry.FetchTags(config, imageTagMap, domainGroupedRepoMap, repoWithRegistryMap, uniqueImagesCount, mocks.FetcherFunc)
+		registry.FetchTags(config, imageTagMap, domainGroupedRepoMap, domainConfiguredRegistryMap, uniqueImagesCount, mocks.FetcherFunc)
 	} else {
-		registry.FetchTags(config, imageTagMap, domainGroupedRepoMap, repoWithRegistryMap, uniqueImagesCount, registry.FetcherFunc)
+		registry.FetchTags(config, imageTagMap, domainGroupedRepoMap, domainConfiguredRegistryMap, uniqueImagesCount, registry.FetcherFunc)
 	}
 
 	// Process container image versions and print

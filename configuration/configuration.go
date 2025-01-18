@@ -16,7 +16,7 @@ import (
 )
 
 // These are public for marshalling
-type ConfigRepo struct {
+type ConfigRegistry struct {
 	Domain string  `yaml:"domain"`
 	Auth   *string `yaml:"auth"`
 	Token  *string `yaml:"token"`
@@ -24,16 +24,16 @@ type ConfigRepo struct {
 }
 
 type ConfigFile struct {
-	Host           *string               `yaml:"host"`
-	Debug          *bool                 `yaml:"debug"`
-	IncludeStopped *bool                 `yaml:"includeStopped"`
-	NoProgress     *bool                 `yaml:"noProgress"`
-	Repositories   map[string]ConfigRepo `yaml:"repositories"`
+	Host           *string                   `yaml:"host"`
+	Debug          *bool                     `yaml:"debug"`
+	IncludeStopped *bool                     `yaml:"includeStopped"`
+	NoProgress     *bool                     `yaml:"noProgress"`
+	Registries     map[string]ConfigRegistry `yaml:"registries"`
 }
 
-func ParseConfigFile(cmdFlags *CommandFlags, repoWithRegistryMap ConfigRepoWithRegistryMap) Config {
+func ParseConfigFile(cmdFlags *CommandFlags, domainConfiguredRegistryMap DomainConfiguredRegistryMap) Config {
 	// Create object for unmarshalling our YAML
-	configFile := ConfigFile{Repositories: make(map[string]ConfigRepo)}
+	configFile := ConfigFile{Registries: make(map[string]ConfigRegistry)}
 
 	data, err := os.ReadFile(*cmdFlags.ConfigPathPtr)
 	if err != nil {
@@ -82,25 +82,25 @@ func ParseConfigFile(cmdFlags *CommandFlags, repoWithRegistryMap ConfigRepoWithR
 	})
 
 	// Iterate over config and map registries
-	for cfgRepoName, cfgRepo := range configFile.Repositories {
+	for registryName, configRegistry := range configFile.Registries {
 
-		normalizedUrl := cfgRepo.Domain
+		normalizedUrl := configRegistry.Domain
 		if config.Debug {
 			fmt.Println(" ** Pre normalized url", normalizedUrl)
 		}
-		if strings.Index(cfgRepo.Domain, "https://") == -1 {
-			normalizedUrl = fmt.Sprintf("https://%s/v2", cfgRepo.Domain)
+		if strings.Index(configRegistry.Domain, "https://") == -1 {
+			normalizedUrl = fmt.Sprintf("https://%s/v2", configRegistry.Domain)
 		}
 
 		if config.Debug {
-			fmt.Println("cfgRepo auth", cfgRepo.Auth)
+			fmt.Println("cfgRepo auth", configRegistry.Auth)
 		}
 		authType := AuthTypes.None
-		if cfgRepo.Auth != nil {
+		if configRegistry.Auth != nil {
 			if config.Debug {
 				fmt.Println("authtype not nil")
 			}
-			switch *cfgRepo.Auth {
+			switch *configRegistry.Auth {
 			case "basic":
 				if config.Debug {
 					fmt.Println("authtype switch basic")
@@ -115,39 +115,39 @@ func ParseConfigFile(cmdFlags *CommandFlags, repoWithRegistryMap ConfigRepoWithR
 		}
 
 		authToken := ""
-		if cfgRepo.Token != nil {
-			authToken = *cfgRepo.Token
+		if configRegistry.Token != nil {
+			authToken = *configRegistry.Token
 		}
 
-		if reg, ok := registry.DomainRegistryMap[cfgRepo.Domain]; !ok {
+		if reg, ok := registry.DomainRegistryMap[configRegistry.Domain]; !ok {
 			// If domain is not found in the map, treat it like a custom registry
 
 			// Set normalizedUrl if not overridden from config
 			registryUrl := normalizedUrl
-			if cfgRepo.Url != nil {
-				registryUrl = *cfgRepo.Url
+			if configRegistry.Url != nil {
+				registryUrl = *configRegistry.Url
 			}
 
-			repoWithRegistryMap[cfgRepo.Domain] = ConfigRepoWithRegistry{
+			domainConfiguredRegistryMap[configRegistry.Domain] = ConfiguredRegistry{
 				AuthType:  authType,
 				AuthToken: authToken,
-				Name:      cfgRepoName,
+				Name:      registryName,
 				Registry:  registry.Custom{RegistryUrl: registryUrl},
-				Domain:    cfgRepo.Domain,
+				Domain:    configRegistry.Domain,
 			}
 		} else {
-			repoWithRegistryMap[cfgRepo.Domain] = ConfigRepoWithRegistry{
+			domainConfiguredRegistryMap[configRegistry.Domain] = ConfiguredRegistry{
 				AuthType:  authType,
 				AuthToken: authToken,
-				Name:      cfgRepoName,
+				Name:      registryName,
 				Registry:  reg,
-				Domain:    cfgRepo.Domain,
+				Domain:    configRegistry.Domain,
 			}
 		}
 	}
 
 	if config.Debug {
-		fmt.Println("repo map", repoWithRegistryMap)
+		fmt.Println("repo map", domainConfiguredRegistryMap)
 	}
 
 	return config

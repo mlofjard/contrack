@@ -12,9 +12,6 @@ func (r Custom) GetUrl() string {
 	return r.RegistryUrl
 }
 
-func (r Custom) GetAuth(rg GroupedRepo) (string, AuthType) {
-	if rg.AuthType != AuthTypes.None {
-		return rg.AuthToken, rg.AuthType
-	}
-	return "", rg.AuthType
+func (r Custom) GetAuth(rg GroupedRepository, authType AuthType, token string) (string, AuthType) {
+	return token, authType
 }

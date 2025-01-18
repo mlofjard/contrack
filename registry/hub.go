@@ -22,21 +22,23 @@ func (r Hub) GetUrl() string {
 	return r.registryUrl
 }
 
-func (r Hub) GetAuth(rg GroupedRepo) (string, AuthType) {
+func (r Hub) GetAuth(rg GroupedRepository, authType AuthType, token string) (string, AuthType) {
 	client := resty.New().
 		SetHeader("accept", "application/json").
 		SetQueryParam("service", "registry.docker.io").
 		SetQueryParam("grant_type", "password")
 
+	if authType != AuthTypes.None {
+		client.SetAuthScheme(authType.Scheme)
+		client.SetAuthToken(token)
+	}
+
 	template := "scope=repository:%s:pull"
-	scopes := make([]string, len(rg.Images))
-	for i, s := range rg.Images {
+	scopes := make([]string, len(rg.Paths))
+	for i, s := range rg.Paths {
 		scopes[i] = fmt.Sprintf(template, s)
 	}
-	// preScopes := slices.Concat([]string{"service=registry.docker.io"}, scopes)
-	// postScopes := slices.Concat(preScopes, []string{"grant_type=password"})
 	queryScopes := strings.Join(scopes, "&")
-	// fmt.Println("Scopes QP", queryScopes)
 	url := fmt.Sprintf("https://auth.docker.io/token?%s", queryScopes)
 	authResponse := &hubAuthResponse{}
 	resp, err := client.R().
@@ -49,7 +51,6 @@ func (r Hub) GetAuth(rg GroupedRepo) (string, AuthType) {
 	if resp.StatusCode() != 200 {
 		log.Fatalf("wrong status: %s\n", resp.Body())
 	}
-	// fmt.Println("Got auth response", authResponse)
 
 	return authResponse.Token, AuthTypes.Bearer
 }

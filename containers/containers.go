@@ -39,7 +39,7 @@ func ContainerFunc(config Config) []Container {
 	return result
 }
 
-func GetContainers(config Config, repoWithRegistryMap ConfigRepoWithRegistryMap, containerFn ContainerFn) TrackedContainers {
+func GetContainers(config Config, repoWithRegistryMap DomainConfiguredRegistryMap, containerFn ContainerFn) TrackedContainers {
 	containers := containerFn(config)
 
 	// Sort containers by name
@@ -69,42 +69,40 @@ func GetContainers(config Config, repoWithRegistryMap ConfigRepoWithRegistryMap,
 		trackedContainers[idx] = TrackedContainer{
 			Name:    ctr.Name,
 			Tracked: tracked,
+			Labels: ContainerLabels{
+				Include:   includeLabel,
+				Transform: transformLabel,
+			},
 			Image: ContainerImage{
-				Name:   path,
+				Path:   path,
 				Tag:    tag,
 				Domain: domain,
-				Labels: ContainerLabels{
-					Include:   includeLabel,
-					Transform: transformLabel,
-				},
 			},
 		}
 	}
 	return trackedContainers
 }
 
-func GroupContainers(config Config, repos DomainGroupedRepoMap, repoWithRegistryMap ConfigRepoWithRegistryMap, trackedContainers TrackedContainers) int {
+func GroupContainers(config Config, domainGroupedRepoMap DomainGroupedRepoMap, domainConfiguredRegistryMap DomainConfiguredRegistryMap, trackedContainers TrackedContainers) int {
 	uniqueImageCount := 0
 
 	for _, ctr := range trackedContainers {
 		domain := ctr.Image.Domain
-		imageName := ctr.Image.Name
-		if domainCfg, foundInConfig := repoWithRegistryMap[domain]; foundInConfig {
+		path := ctr.Image.Path
+		if _, foundInConfig := domainConfiguredRegistryMap[domain]; foundInConfig {
 			// If config section found
-			if domainGroup, foundInMap := repos[domain]; !foundInMap {
+			if domainGroup, foundInMap := domainGroupedRepoMap[domain]; !foundInMap {
 				// If map key is missing, set map key and add image
-				repos[domain] = GroupedRepo{
-					AuthType:  domainCfg.AuthType,
-					AuthToken: domainCfg.AuthToken,
-					Domain:    domain,
-					Images:    []string{imageName},
+				domainGroupedRepoMap[domain] = GroupedRepository{
+					Domain: domain,
+					Paths:  []string{path},
 				}
 				uniqueImageCount++
 			} else {
 				// If map key exists, just append image (if unique)
-				if !slices.Contains(domainGroup.Images, imageName) {
-					domainGroup.Images = append(domainGroup.Images, imageName)
-					repos[domain] = domainGroup
+				if !slices.Contains(domainGroup.Paths, path) {
+					domainGroup.Paths = append(domainGroup.Paths, path)
+					domainGroupedRepoMap[domain] = domainGroup
 					uniqueImageCount++
 				}
 			}
@@ -132,12 +130,12 @@ func ProcessTrackedContainers(config Config, imageTagMap ImageTagMap, trackedCon
 	for _, ctr := range trackedContainers {
 		status := "OK"
 		image := ctr.Image
-		uniqueIdentifier := fmt.Sprintf("%s/%s", image.Domain, image.Name)
+		uniqueIdentifier := fmt.Sprintf("%s/%s", image.Domain, image.Path)
 		if config.Debug {
 			fmt.Println("**** Name:", ctr.Name)
-			fmt.Println("**** Image:", image.Name)
-			fmt.Println("**** Include:", image.Labels.Include)
-			fmt.Println("**** Transform:", image.Labels.Transform)
+			fmt.Println("**** Image:", image.Path)
+			fmt.Println("**** Include:", ctr.Labels.Include)
+			fmt.Println("**** Transform:", ctr.Labels.Transform)
 		}
 
 		if imageTags, ok := imageTagMap[uniqueIdentifier]; ok {
@@ -154,12 +152,12 @@ func ProcessTrackedContainers(config Config, imageTagMap ImageTagMap, trackedCon
 					status = fmt.Sprintf("Error %d", imageTags.Status)
 				}
 			} else {
-				includeRegex, _ := regexp.Compile(image.Labels.Include)
-				replaceSplit := strings.Split(image.Labels.Transform, "=>")
+				includeRegex, _ := regexp.Compile(ctr.Labels.Include)
+				replaceSplit := strings.Split(ctr.Labels.Transform, "=>")
 				transformedTag := image.Tag
 
 				transformRegex, _ := regexp.Compile(strings.TrimSpace(replaceSplit[0]))
-				if image.Labels.Transform != "" {
+				if ctr.Labels.Transform != "" {
 					transformedTag = transformRegex.ReplaceAllString(image.Tag, strings.TrimSpace(replaceSplit[1]))
 				}
 
@@ -185,7 +183,7 @@ func ProcessTrackedContainers(config Config, imageTagMap ImageTagMap, trackedCon
 				semverFilteredMap := make(map[string]string, len(filteredTags))
 				for i, ft := range filteredTags {
 					tt := ft
-					if image.Labels.Transform != "" {
+					if ctr.Labels.Transform != "" {
 						tt = transformRegex.ReplaceAllString(ft, strings.TrimSpace(replaceSplit[1]))
 					}
 					v, err := semver.NewVersion(tt)
@@ -217,13 +215,13 @@ func ProcessTrackedContainers(config Config, imageTagMap ImageTagMap, trackedCon
 					newVersionString = semverFilteredMap[latestSemver.String()]
 				}
 			}
-			fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n", status, ctr.Image.Domain, ctr.Name, image.Name, image.Tag, newVersionString)
+			fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n", status, ctr.Image.Domain, ctr.Name, image.Path, image.Tag, newVersionString)
 		} else {
 			status := "Config missing"
 			if ctr.Tracked {
 				status = "No tags found"
 			}
-			fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n", status, ctr.Image.Domain, ctr.Name, image.Name, image.Tag, "")
+			fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n", status, ctr.Image.Domain, ctr.Name, image.Path, image.Tag, "")
 		}
 	}
 

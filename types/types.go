@@ -29,9 +29,9 @@ type Config struct {
 	NoProgress bool
 	Host       string
 }
-type ConfigRepoWithRegistryMap = map[string]ConfigRepoWithRegistry
+type DomainConfiguredRegistryMap = map[string]ConfiguredRegistry
 
-type ConfigRepoWithRegistry struct {
+type ConfiguredRegistry struct {
 	AuthType  AuthType
 	AuthToken string
 	Domain    string
@@ -49,13 +49,13 @@ type TrackedContainer struct {
 	Name    string
 	Tracked bool
 	Image   ContainerImage
+	Labels  ContainerLabels
 }
 
 type ContainerImage struct {
-	Name   string
+	Path   string
 	Domain string
 	Tag    string
-	Labels ContainerLabels
 }
 
 type ContainerLabels struct {
@@ -67,15 +67,15 @@ type ContainerFn = func(Config) []Container
 
 type FetcherFn = func(string, AuthType, string, string, *TagList, string) int
 
-type GroupedRepo struct {
-	AuthType  AuthType
-	AuthToken string
-	Domain    string
-	Images    []string
+type GroupedRepository struct {
+	// AuthType  AuthType
+	// AuthToken string
+	Domain string
+	Paths  []string
 }
 
 type Registry interface {
-	GetAuth(rg GroupedRepo) (string, AuthType)
+	GetAuth(GroupedRepository, AuthType, string) (string, AuthType)
 	GetUrl() string
 }
 
@@ -85,7 +85,7 @@ type TagList struct {
 
 type TrackedContainers = []TrackedContainer
 
-type DomainGroupedRepoMap = map[string]GroupedRepo
+type DomainGroupedRepoMap = map[string]GroupedRepository
 
 type ImageTags struct {
 	Status int

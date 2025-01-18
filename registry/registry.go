@@ -62,7 +62,7 @@ func FetcherFunc(regUrl string, authType AuthType, authToken string, image strin
 	return status
 }
 
-func FetchTags(config Config, imageTagMap ImageTagMap, domainGroupedRepoMap DomainGroupedRepoMap, repoWithRegistryMap ConfigRepoWithRegistryMap, imageCount int, fetcherFn FetcherFn) {
+func FetchTags(config Config, imageTagMap ImageTagMap, domainGroupedRepoMap DomainGroupedRepoMap, domainConfiguredRegistryMap DomainConfiguredRegistryMap, imageCount int, fetcherFn FetcherFn) {
 	bar := p.NewOptions(imageCount,
 		p.OptionSetWriter(os.Stdout),
 		p.OptionClearOnFinish(),
@@ -75,32 +75,32 @@ func FetchTags(config Config, imageTagMap ImageTagMap, domainGroupedRepoMap Doma
 
 	for domain, groupedRepo := range domainGroupedRepoMap {
 		if config.Debug {
-			fmt.Printf("Domain: %s, Images: %d\n", domain, len(groupedRepo.Images))
+			fmt.Printf("Domain: %s, Images: %d\n", domain, len(groupedRepo.Paths))
 		}
 
 		authType := AuthTypes.None
 		authToken := ""
-		if configuredRepo, ok := repoWithRegistryMap[groupedRepo.Domain]; ok {
+		if configuredRegistry, ok := domainConfiguredRegistryMap[groupedRepo.Domain]; ok {
 
-			reg := configuredRepo.Registry
+			reg := configuredRegistry.Registry
 
 			if config.Debug {
 				fmt.Printf("Registry found with url: %s\n", reg.GetUrl())
 			}
 
 			regUrl := reg.GetUrl()
-			token, regAuthType := reg.GetAuth(groupedRepo)
+			token, regAuthType := reg.GetAuth(groupedRepo, configuredRegistry.AuthType, configuredRegistry.AuthToken)
 			if token != "" {
 				authType = regAuthType
 				authToken = token
 			}
 
-			for _, image := range groupedRepo.Images {
+			for _, path := range groupedRepo.Paths {
 				// Fetch all tags
 				remoteTags := &TagList{Tags: []string{}}
-				status := fetcherFn(regUrl, authType, authToken, image, remoteTags, "")
+				status := fetcherFn(regUrl, authType, authToken, path, remoteTags, "")
 
-				uniqueIdentifier := fmt.Sprintf("%s/%s", domain, image)
+				uniqueIdentifier := fmt.Sprintf("%s/%s", domain, path)
 				imageTagMap[uniqueIdentifier] = ImageTags{Status: status, Tags: remoteTags.Tags}
 				bar.Add(1)
 			}

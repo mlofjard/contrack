@@ -7,15 +7,15 @@ import (
 	. "github.com/mlofjard/contrack/types"
 )
 
-func ParseConfigFile(cmdFlags *CommandFlags, repoWithRegistryMap ConfigRepoWithRegistryMap) Config {
-	repoWithRegistryMap["lscr.io"] = ConfigRepoWithRegistry{
+func ParseConfigFile(cmdFlags *CommandFlags, domainConfiguredRegistryMap DomainConfiguredRegistryMap) Config {
+	domainConfiguredRegistryMap["lscr.io"] = ConfiguredRegistry{
 		AuthType:  AuthTypes.None,
 		AuthToken: "",
 		Name:      "lscr",
 		Domain:    "lscr.io",
 		Registry:  registry.DomainRegistryMap["lscr.io"],
 	}
-	repoWithRegistryMap["docker.io"] = ConfigRepoWithRegistry{
+	domainConfiguredRegistryMap["docker.io"] = ConfiguredRegistry{
 		AuthType:  AuthTypes.None,
 		AuthToken: "",
 		Name:      "hub",
