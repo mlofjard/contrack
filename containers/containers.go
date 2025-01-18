@@ -18,22 +18,37 @@ import (
 	apiClient "github.com/docker/docker/client"
 )
 
-func GetContainers(config Config, trackedContainers TrackedContainers) int {
+func ContainerFunc(config Config) []Container {
 	// Setup docker API client
-	client, err := apiClient.NewClientWithOpts(apiClient.WithHost(config.SocketPath))
+	client, err := apiClient.NewClientWithOpts(apiClient.WithHost(config.Host))
 	if err != nil {
 		panic(err)
 	}
 	defer client.Close()
 
 	// Fetch list on containers
-	containers, err := client.ContainerList(context.Background(), apiContainer.ListOptions{All: true})
+	containers, err := client.ContainerList(context.Background(), apiContainer.ListOptions{All: config.IncludeAll})
 	if err != nil {
 		panic(err)
 	}
 
-	for _, ctr := range containers {
-		containerName := strings.TrimPrefix(ctr.Names[0], "/")
+	result := make([]Container, len(containers))
+	for idx, ctr := range containers {
+		result[idx] = Container{Name: strings.TrimPrefix(ctr.Names[0], "/"), Image: ctr.Image, Labels: ctr.Labels}
+	}
+	return result
+}
+
+func GetContainers(config Config, repoWithRegistryMap ConfigRepoWithRegistryMap, containerFn ContainerFn) TrackedContainers {
+	containers := containerFn(config)
+
+	// Sort containers by name
+	slices.SortFunc(containers, func(a Container, b Container) int {
+		return strings.Compare(a.Name, b.Name)
+	})
+
+	trackedContainers := make(TrackedContainers, len(containers))
+	for idx, ctr := range containers {
 		parsed, _ := reference.ParseDockerRef(ctr.Image)
 		domain := reference.Domain(parsed)
 		path := reference.Path(parsed)
@@ -46,8 +61,14 @@ func GetContainers(config Config, trackedContainers TrackedContainers) int {
 		if label, ok := ctr.Labels["wud.tag.transform"]; ok {
 			transformLabel = label
 		}
-		trackedContainers[containerName] = Container{
-			Name: containerName,
+		tracked := false
+		if _, foundInConfig := repoWithRegistryMap[domain]; foundInConfig {
+			tracked = true
+		}
+
+		trackedContainers[idx] = TrackedContainer{
+			Name:    ctr.Name,
+			Tracked: tracked,
 			Image: ContainerImage{
 				Name:   path,
 				Tag:    tag,
@@ -59,7 +80,7 @@ func GetContainers(config Config, trackedContainers TrackedContainers) int {
 			},
 		}
 	}
-	return len(containers)
+	return trackedContainers
 }
 
 func GroupContainers(config Config, repos DomainGroupedRepoMap, repoWithRegistryMap ConfigRepoWithRegistryMap, trackedContainers TrackedContainers) int {
@@ -102,12 +123,14 @@ func ProcessTrackedContainers(config Config, imageTagMap ImageTagMap, trackedCon
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 
 	if len(trackedContainers) > 0 {
-		fmt.Fprintln(w, "Container\tImage\tTag\tUpdate")
+		fmt.Fprintln(w, "Status\tRepository\tContainer\tImage\tTag\tUpdate")
 	} else {
-		fmt.Println("No tracked containers found")
+		fmt.Println("No containers found")
 	}
+
 	// Iterate over watched containers
 	for _, ctr := range trackedContainers {
+		status := "OK"
 		image := ctr.Image
 		uniqueIdentifier := fmt.Sprintf("%s/%s", image.Domain, image.Name)
 		if config.Debug {
@@ -117,59 +140,90 @@ func ProcessTrackedContainers(config Config, imageTagMap ImageTagMap, trackedCon
 			fmt.Println("**** Transform:", image.Labels.Transform)
 		}
 
-		if tags, ok := imageTagMap[uniqueIdentifier]; ok {
-			includeRegex, _ := regexp.Compile(image.Labels.Include)
-			replaceSplit := strings.Split(image.Labels.Transform, "=>")
-			transformedTag := image.Tag
+		if imageTags, ok := imageTagMap[uniqueIdentifier]; ok {
+			// If imageTags exists
 
-			transformRegex, _ := regexp.Compile(strings.TrimSpace(replaceSplit[0]))
-			if image.Labels.Transform != "" {
-				transformedTag = transformRegex.ReplaceAllString(image.Tag, strings.TrimSpace(replaceSplit[1]))
-			}
-
-			localSemver, err := semver.NewVersion(transformedTag)
-			if err != nil {
-				localSemver = semverMin
-			}
-			// fmt.Fprintf(w, "      Local tag: %s (%s)\n", image.Tag, localSemver)
-
-			filteredTags := slices.DeleteFunc(slices.Clone(tags), func(t string) bool { return !includeRegex.MatchString(t) })
-
-			transformedTags := make([]string, len(filteredTags))
-			semverTags := make([]*semver.Version, len(filteredTags))
-			semverFilteredMap := make(map[string]string, len(filteredTags))
-			for i, ft := range filteredTags {
-				tt := ft
-				if image.Labels.Transform != "" {
-					tt = transformRegex.ReplaceAllString(ft, strings.TrimSpace(replaceSplit[1]))
-				}
-				v, err := semver.NewVersion(tt)
-				if err != nil {
-					//fmt.Fprintf(w, "Error parsing version: %s", err)
-					v = semverMin
-				}
-
-				semverTags[i] = v
-				transformedTags[i] = tt
-				semverFilteredMap[v.String()] = filteredTags[i] // this works because filteredTags is same length as transformedTags
-			}
-
-			sort.Sort(semver.Collection(semverTags))
-			latestSemver := semverMin
-			if len(semverTags) > 0 {
-				latestSemver = semverTags[len(semverTags)-1]
-			}
-
-			c, _ := semver.NewConstraint(fmt.Sprintf("> %s", localSemver))
-			newVersion := c.Check(latestSemver)
 			newVersionString := ""
-			if newVersion {
-				newVersionString = semverFilteredMap[latestSemver.String()]
-			}
+			if imageTags.Status != 200 {
+				switch imageTags.Status {
+				case 401:
+					status = "Auth error"
+				case 500:
+					status = "Server error"
+				default:
+					status = fmt.Sprintf("Error %d", imageTags.Status)
+				}
+			} else {
+				includeRegex, _ := regexp.Compile(image.Labels.Include)
+				replaceSplit := strings.Split(image.Labels.Transform, "=>")
+				transformedTag := image.Tag
 
-			fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", ctr.Name, image.Name, image.Tag, newVersionString)
+				transformRegex, _ := regexp.Compile(strings.TrimSpace(replaceSplit[0]))
+				if image.Labels.Transform != "" {
+					transformedTag = transformRegex.ReplaceAllString(image.Tag, strings.TrimSpace(replaceSplit[1]))
+				}
+
+				if config.Debug {
+					fmt.Println("**** > Transformed tag:", transformedTag)
+				}
+
+				localSemver, err := semver.NewVersion(transformedTag)
+				if err != nil {
+					localSemver = semverMin
+					status = "SemVer error"
+				}
+				// fmt.Fprintf(w, "      Local tag: %s (%s)\n", image.Tag, localSemver)
+
+				filteredTags := slices.DeleteFunc(slices.Clone(imageTags.Tags), func(t string) bool { return !includeRegex.MatchString(t) })
+
+				if config.Debug {
+					fmt.Printf("**** > Filtered tags: %d\n", len(filteredTags))
+				}
+
+				transformedTags := make([]string, len(filteredTags))
+				semverTags := make([]*semver.Version, len(filteredTags))
+				semverFilteredMap := make(map[string]string, len(filteredTags))
+				for i, ft := range filteredTags {
+					tt := ft
+					if image.Labels.Transform != "" {
+						tt = transformRegex.ReplaceAllString(ft, strings.TrimSpace(replaceSplit[1]))
+					}
+					v, err := semver.NewVersion(tt)
+					if err != nil {
+						//fmt.Fprintf(w, "Error parsing version: %s", err)
+						v = semverMin
+					}
+
+					semverTags[i] = v
+					transformedTags[i] = tt
+					semverFilteredMap[v.String()] = filteredTags[i] // this works because filteredTags is same length as transformedTags
+				}
+
+				if config.Debug {
+					fmt.Printf("**** > Transformed tags: %d\n", len(transformedTags))
+				}
+
+				sort.Sort(semver.Collection(semverTags))
+				latestSemver := semverMin
+				if len(semverTags) > 0 {
+					latestSemver = semverTags[len(semverTags)-1]
+				} else {
+					status = "No matching tags"
+				}
+
+				c, _ := semver.NewConstraint(fmt.Sprintf("> %s", localSemver))
+				newVersion := c.Check(latestSemver)
+				if newVersion {
+					newVersionString = semverFilteredMap[latestSemver.String()]
+				}
+			}
+			fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n", status, ctr.Image.Domain, ctr.Name, image.Name, image.Tag, newVersionString)
 		} else {
-			fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", ctr.Name, image.Name, image.Tag, "no matches")
+			status := "Config missing"
+			if ctr.Tracked {
+				status = "No tags found"
+			}
+			fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n", status, ctr.Image.Domain, ctr.Name, image.Name, image.Tag, "")
 		}
 	}
 

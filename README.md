@@ -6,20 +6,26 @@ Heavily inspired by [What's Up Docker](https://github.com/getwud/wud) but withou
 ## Usage
 
 ```
-> contrack -h
-
-Usage of ./contrack:
-  -debug
-        Enable debug output
-  -f string
-        Specify config file path (default "config.yaml")
-  -mock string
-        Enable mocks (none, config, containers, registry, all) (default "none")
-  -np
-        Hide progress bar
+> contrack
 ```
 
 No really, it's just a command file.
+
+### Command options
+```
+> contrack --help
+
+Usage: contrack [OPTION]
+
+Options:
+  -f, --config string   Specify config file path (default "config.yaml")
+  -d, --debug           Enable debug output
+  -h, --host string     Set docker/podman host (default "unix:///var/run/docker/docker.sock")
+  -a, --include-all     Include stopped containers
+  -n, --no-progress     Hide progress bar
+      --version         Print version information and exit
+      --help            Print Help (this message) and exit
+```
 
 ## Configuration
 
@@ -27,8 +33,10 @@ There is a `example_config.yaml` file included with the code.
 
 ```yaml
 ---
-# Path to docker/podman socket
-socketPath: unix:///run/docker/docker.sock
+# Path to docker/podman socket/TCP
+host: unix:///run/docker/docker.sock
+# Include stopped containers, not just the running ones
+includeStopped: false
 # Hide the progress bar (only output table)
 noProgress: false
 # Print debug info
@@ -52,9 +60,9 @@ repositories:
     #   authentication is needed for the repo.
     #   Some repositories have special authorization procedures,
     #   like docker hub. Contrack has built in support for the
-    #   procedure that Docker Hub uses for its anynomous access,
-    #   but everything else just uses the standard `authorization`
-    #   header in the HTTP request for tag fetching.
+    #   procedure that Docker Hub and GHCR uses for its anynomous
+    #   access, but everything else just uses the standard
+    #   `authorization` header in the HTTP request for tag fetching.
   #   [token] the authorization token to send in the header
   #   [url] can be defined if your custom repository uses a non V2
     #   standard URL. Otherwise this will be constructed from [domain]

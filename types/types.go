@@ -4,7 +4,11 @@ type CommandFlags struct {
 	ConfigPathPtr *string
 	DebugPtr      *bool
 	MockPtr       *string
+	HostPtr       *string
+	IncludeAllPtr *bool
 	NoProgressPtr *bool
+	VersionPtr    *bool
+	HelpPtr       *bool
 }
 
 type AuthType struct {
@@ -21,8 +25,9 @@ var AuthTypes = authTypes{None: AuthType{0, "None"}, Basic: AuthType{1, "Basic"}
 
 type Config struct {
 	Debug      bool
+	IncludeAll bool
 	NoProgress bool
-	SocketPath string
+	Host       string
 }
 type ConfigRepoWithRegistryMap = map[string]ConfigRepoWithRegistry
 
@@ -35,8 +40,15 @@ type ConfigRepoWithRegistry struct {
 }
 
 type Container struct {
-	Name  string
-	Image ContainerImage
+	Name   string
+	Image  string
+	Labels map[string]string
+}
+
+type TrackedContainer struct {
+	Name    string
+	Tracked bool
+	Image   ContainerImage
 }
 
 type ContainerImage struct {
@@ -51,7 +63,9 @@ type ContainerLabels struct {
 	Transform string
 }
 
-type FetcherFn = func(string, AuthType, string, string, *TagList, string)
+type ContainerFn = func(Config) []Container
+
+type FetcherFn = func(string, AuthType, string, string, *TagList, string) int
 
 type GroupedRepo struct {
 	AuthType  AuthType
@@ -69,8 +83,13 @@ type TagList struct {
 	Tags []string
 }
 
-type TrackedContainers = map[string]Container
+type TrackedContainers = []TrackedContainer
 
 type DomainGroupedRepoMap = map[string]GroupedRepo
 
-type ImageTagMap = map[string][]string
+type ImageTags struct {
+	Status int
+	Tags   []string
+}
+
+type ImageTagMap = map[string]ImageTags

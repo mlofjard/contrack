@@ -1,8 +1,9 @@
 package configuration
 
 import (
-	"flag"
+	"errors"
 	"fmt"
+	"io/fs"
 	"log"
 	"os"
 	"strings"
@@ -10,6 +11,7 @@ import (
 	"github.com/mlofjard/contrack/registry"
 	. "github.com/mlofjard/contrack/types"
 
+	flag "github.com/spf13/pflag"
 	"gopkg.in/yaml.v3"
 )
 
@@ -22,10 +24,11 @@ type ConfigRepo struct {
 }
 
 type ConfigFile struct {
-	SocketPath   *string               `yaml:"socketPath"`
-	Debug        *bool                 `yaml:"debug"`
-	NoProgress   *bool                 `yaml:"noProgress"`
-	Repositories map[string]ConfigRepo `yaml:"repositories"`
+	Host           *string               `yaml:"host"`
+	Debug          *bool                 `yaml:"debug"`
+	IncludeStopped *bool                 `yaml:"includeStopped"`
+	NoProgress     *bool                 `yaml:"noProgress"`
+	Repositories   map[string]ConfigRepo `yaml:"repositories"`
 }
 
 func ParseConfigFile(cmdFlags *CommandFlags, repoWithRegistryMap ConfigRepoWithRegistryMap) Config {
@@ -34,17 +37,20 @@ func ParseConfigFile(cmdFlags *CommandFlags, repoWithRegistryMap ConfigRepoWithR
 
 	data, err := os.ReadFile(*cmdFlags.ConfigPathPtr)
 	if err != nil {
-		log.Fatalf("error: %v", err)
+		if !errors.Is(err, fs.ErrNotExist) {
+			log.Fatalf("Error reading config file: %v", err)
+		}
 	}
 	err = yaml.Unmarshal([]byte(data), &configFile)
 	if err != nil {
-		log.Fatalf("error: %v", err)
+		log.Fatalf("Error parsing config file: %v", err)
 	}
 
 	// Default values
 	config := Config{
 		Debug:      false,
-		SocketPath: "unix:///var/run/docker/docker.sock",
+		NoProgress: false,
+		Host:       "unix:///var/run/docker/docker.sock",
 	}
 
 	// Override from config
@@ -54,8 +60,11 @@ func ParseConfigFile(cmdFlags *CommandFlags, repoWithRegistryMap ConfigRepoWithR
 	if configFile.NoProgress != nil {
 		config.NoProgress = *configFile.NoProgress
 	}
-	if configFile.SocketPath != nil {
-		config.SocketPath = *configFile.SocketPath
+	if configFile.Host != nil {
+		config.Host = *configFile.Host
+	}
+	if configFile.IncludeStopped != nil {
+		config.IncludeAll = *configFile.IncludeStopped
 	}
 
 	// Override from flags
@@ -63,8 +72,12 @@ func ParseConfigFile(cmdFlags *CommandFlags, repoWithRegistryMap ConfigRepoWithR
 		switch f.Name {
 		case "debug":
 			config.Debug = *cmdFlags.DebugPtr
-		case "np":
+		case "include-all":
+			config.IncludeAll = *cmdFlags.IncludeAllPtr
+		case "no-progress":
 			config.NoProgress = *cmdFlags.NoProgressPtr
+		case "host":
+			config.Host = *cmdFlags.HostPtr
 		}
 	})
 

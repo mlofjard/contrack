@@ -2,7 +2,6 @@ package registry
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"slices"
 
@@ -24,7 +23,8 @@ type tagResponse struct {
 	Tags []string
 }
 
-func FetcherFunc(regUrl string, authType AuthType, authToken string, image string, tags *TagList, last string) {
+func FetcherFunc(regUrl string, authType AuthType, authToken string, image string, tags *TagList, last string) int {
+	status := 200
 	client := resty.New().
 		SetQueryParam("n", "1000").
 		SetQueryParam("last", last)
@@ -41,10 +41,12 @@ func FetcherFunc(regUrl string, authType AuthType, authToken string, image strin
 		Get(url)
 
 	if err != nil {
-		log.Fatalf("fetch tags error: %s", err)
+		tags.Tags = []string{}
+		return -1
 	}
 	if resp.StatusCode() != 200 {
-		log.Fatalf("wrong status, tags: %s", resp.Status())
+		tags.Tags = []string{}
+		return resp.StatusCode()
 	}
 	var lastTag string
 	newList := make([]string, len(tagResponse.Tags))
@@ -55,8 +57,9 @@ func FetcherFunc(regUrl string, authType AuthType, authToken string, image strin
 	tags.Tags = slices.Concat(tags.Tags, newList)
 
 	if resp.Header().Get("link") != "" {
-		FetcherFunc(regUrl, authType, authToken, image, tags, lastTag)
+		status = FetcherFunc(regUrl, authType, authToken, image, tags, lastTag)
 	}
+	return status
 }
 
 func FetchTags(config Config, imageTagMap ImageTagMap, domainGroupedRepoMap DomainGroupedRepoMap, repoWithRegistryMap ConfigRepoWithRegistryMap, imageCount int, fetcherFn FetcherFn) {
@@ -93,19 +96,12 @@ func FetchTags(config Config, imageTagMap ImageTagMap, domainGroupedRepoMap Doma
 			}
 
 			for _, image := range groupedRepo.Images {
-
-				if config.Debug {
-					fmt.Printf("Fetch tags for %s/%s  ", domain, image)
-				}
 				// Fetch all tags
 				remoteTags := &TagList{Tags: []string{}}
-				fetcherFn(regUrl, authType, authToken, image, remoteTags, "")
-				if config.Debug {
-					fmt.Printf("[%d]\n", len(remoteTags.Tags))
-				}
+				status := fetcherFn(regUrl, authType, authToken, image, remoteTags, "")
 
 				uniqueIdentifier := fmt.Sprintf("%s/%s", domain, image)
-				imageTagMap[uniqueIdentifier] = remoteTags.Tags
+				imageTagMap[uniqueIdentifier] = ImageTags{Status: status, Tags: remoteTags.Tags}
 				bar.Add(1)
 			}
 		} else {
