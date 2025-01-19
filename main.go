@@ -11,12 +11,19 @@ import (
 	. "github.com/mlofjard/contrack/types"
 )
 
+func toggleMock[K ConfigFileReaderFn | ContainerDiscoveryFn | RegistryTagFetcherFn](has bool, mockFn K, realFn K) K {
+	if has {
+		return mockFn
+	}
+	return realFn
+}
+
 func main() {
 	// Setup and parse command flags
 	cmdFlags, mockFlags := command.SetupCommandline()
-	configFileReaderFn := map[bool]ConfigFileReaderFn{true: mocks.ConfigFileReaderFunc, false: configuration.FileReaderFunc}[mockFlags.Has("config")]
-	containerDiscoveryFn := map[bool]ContainerDiscoveryFn{true: mocks.ContainerDiscoveryFunc, false: containers.DiscoveryFunc}[mockFlags.Has("containers")]
-	registryTagFetcherFn := map[bool]RegistryTagFetcherFn{true: mocks.RegistryTagFetcherFunc, false: registry.TagFetcherFunc}[mockFlags.Has("registry")]
+	configFileReaderFn := toggleMock(mockFlags.Has("config"), mocks.ConfigFileReaderFunc, configuration.FileReaderFunc)
+	containerDiscoveryFn := toggleMock(mockFlags.Has("containers"), mocks.ContainerDiscoveryFunc, containers.DiscoveryFunc)
+	registryTagFetcherFn := toggleMock(mockFlags.Has("registry"), mocks.RegistryTagFetcherFunc, registry.TagFetcherFunc)
 
 	// Parse config file to domain -> repo map
 	domainConfiguredRegistryMap := make(DomainConfiguredRegistryMap)
@@ -25,12 +32,11 @@ func main() {
 
 	// Process containers and get domain -> grouped by repo map
 	var trackedContainers TrackedContainers
-	var uniqueImagesCount int
 	trackedContainers = containers.GetContainers(config, domainConfiguredRegistryMap, containerDiscoveryFn)
 
 	// Group containers by repo
 	domainGroupedRepoMap := make(DomainGroupedRepoMap, len(domainConfiguredRegistryMap))
-	uniqueImagesCount = containers.GroupContainers(config, domainGroupedRepoMap, domainConfiguredRegistryMap, trackedContainers)
+	uniqueImagesCount := containers.GroupContainers(config, domainGroupedRepoMap, domainConfiguredRegistryMap, trackedContainers)
 
 	// Fetch tags for all unique images
 	imageTagMap := make(ImageTagMap, uniqueImagesCount)

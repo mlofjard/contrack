@@ -25,9 +25,9 @@ func ContainerDiscoveryFunc(config Config) []Container {
 	images := []Container{
 		{
 			Name:  "jellyfin-ctr",
-			Image: "lscr.io/linuxserver/jellyfin:1.2.3ubu2204-ls73",
+			Image: "lscr.io/linuxserver/jellyfin:2.0.0ubu2204-ls253",
 			Labels: labelMap{
-				"wud.tag.include":   "^\\d+\\.\\d+\\.\\d+ubu\\d+-ls\\d+",
+				"wud.tag.include":   "^\\d+\\.\\d+\\.\\d+ubu\\d+-ls\\d+$",
 				"wud.tag.transform": "^(\\d+\\.\\d+\\.\\d+)ubu\\d+-ls(\\d+)$ => $1-$2",
 			},
 		},
@@ -35,14 +35,14 @@ func ContainerDiscoveryFunc(config Config) []Container {
 			Name:  "wud-ctr",
 			Image: "ghcr.io/getwud/wud:1.2.3",
 			Labels: labelMap{
-				"wud.tag.include": "^\\d+\\.\\d+\\.\\d+",
+				"wud.tag.include": "^\\d+\\.\\d+\\.\\d+$",
 			},
 		},
 		{
 			Name:  "jellyseer-ctr",
 			Image: "docker.io/fallenbagel/jellyseerr:1.2.3",
 			Labels: labelMap{
-				"wud.tag.include": "^\\d+\\.\\d+\\.\\d+",
+				"wud.tag.include": "^\\d+\\.\\d+\\.\\d+$",
 			},
 		},
 	}
