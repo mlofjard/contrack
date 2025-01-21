@@ -40,6 +40,20 @@ A comma separated line of column names
   update               Newer tag found
 ```
 
+## Container labels
+
+`contrack.include` a Regexp describing what tags to consider for SemVer comparison.  
+Example: `"contrack.transform="^\d+\.\d+\.\d+-alpine\d+\.\d+$"
+
+`contrack.transform` a Regexp for transforming a tag into something that can be converted into a valid SemVer.  
+Example: `"contrack.transform="^(\d+\.\d+\.\d+)-alpine\d+\.\d+$ => $1"
+
+`wud.tag.include` and `wud.tag.transform` can also be used if you are already
+using [What's Up Docker](https://github.com/getwud/wud) and don't want to add more tags.
+
+`contrack.parent.image` - A "parent" image to track for the container. Mostly used for images that you've created yourself.  
+Example: `contrack.parent.image=docker.io/library/alpine:3.21`
+
 ## Configuration
 
 There is a `example_config.yaml` file included with the code.

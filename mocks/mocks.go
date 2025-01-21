@@ -27,8 +27,9 @@ func ContainerDiscoveryFunc(config Config) []Container {
 			Name:  "jellyfin-ctr",
 			Image: "lscr.io/linuxserver/jellyfin:2.0.0ubu2204-ls253",
 			Labels: labelMap{
-				"wud.tag.include":   "^\\d+\\.\\d+\\.\\d+ubu\\d+-ls\\d+$",
-				"wud.tag.transform": "^(\\d+\\.\\d+\\.\\d+)ubu\\d+-ls(\\d+)$ => $1-$2",
+				"wud.tag.include":    "thiswillbeoverridden",
+				"contrack.include":   "^\\d+\\.\\d+\\.\\d+ubu\\d+-ls\\d+$",
+				"contrack.transform": "^(\\d+\\.\\d+\\.\\d+)ubu\\d+-ls(\\d+)$ => $1-$2",
 			},
 		},
 		{
@@ -42,7 +43,9 @@ func ContainerDiscoveryFunc(config Config) []Container {
 			Name:  "jellyseer-ctr",
 			Image: "docker.io/fallenbagel/jellyseerr:1.2.3",
 			Labels: labelMap{
-				"wud.tag.include": "^\\d+\\.\\d+\\.\\d+$",
+				"wud.tag.include":         "^\\d+\\.\\d+\\.\\d+$",
+				"contrack.parent.image":   "docker.io/library/alpine:3.20",
+				"contrack.parent.include": "^\\d+\\.\\d+$",
 			},
 		},
 	}
@@ -59,6 +62,7 @@ func RegistryTagFetcherFunc(regUrl string, authType AuthType, authToken string, 
 		"2.0.0",
 		"1.2.0",
 		"1.2.3",
+		"3.21",
 		"latest",
 		"2.0.0-beta4",
 		"1.0.0-beta1",

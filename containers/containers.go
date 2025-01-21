@@ -39,6 +39,65 @@ func DiscoveryFunc(config Config) []Container {
 	return result
 }
 
+func createTrackedContainer(name string, image string, include string, transform string, repoWithRegistryMap DomainConfiguredRegistryMap) TrackedContainer {
+	parsed, _ := reference.ParseDockerRef(image)
+	domain := reference.Domain(parsed)
+	path := reference.Path(parsed)
+	tag := strings.Split(parsed.String(), ":")[1]
+	tracked := false
+	if _, foundInConfig := repoWithRegistryMap[domain]; foundInConfig {
+		tracked = true
+	}
+
+	return TrackedContainer{
+		Name:    name,
+		Tracked: tracked,
+		Labels: ContainerLabels{
+			Include:   include,
+			Transform: transform,
+		},
+		Image: ContainerImage{
+			Path:   path,
+			Tag:    tag,
+			Domain: domain,
+		},
+	}
+
+}
+
+func getTrackedContainer(container Container, repoWithRegistryMap DomainConfiguredRegistryMap) TrackedContainer {
+	includeLabel := ""
+	transformLabel := ""
+	if label, ok := container.Labels["wud.tag.include"]; ok {
+		includeLabel = label
+	}
+	if label, ok := container.Labels["wud.tag.transform"]; ok {
+		transformLabel = label
+	}
+	if label, ok := container.Labels["contrack.include"]; ok {
+		includeLabel = label
+	}
+	if label, ok := container.Labels["contrack.transform"]; ok {
+		transformLabel = label
+	}
+
+	return createTrackedContainer(container.Name, container.Image, includeLabel, transformLabel, repoWithRegistryMap)
+}
+
+func getTrackedParentContainer(container Container, parentImage string, repoWithRegistryMap DomainConfiguredRegistryMap) TrackedContainer {
+	includeLabel := ""
+	transformLabel := ""
+	if label, ok := container.Labels["contrack.parent.include"]; ok {
+		includeLabel = label
+	}
+	if label, ok := container.Labels["contrack.parent.transform"]; ok {
+		transformLabel = label
+	}
+
+	parentName := fmt.Sprintf("%s (parent)", container.Name)
+	return createTrackedContainer(parentName, parentImage, includeLabel, transformLabel, repoWithRegistryMap)
+}
+
 func GetContainers(config Config, repoWithRegistryMap DomainConfiguredRegistryMap, containerFn ContainerDiscoveryFn) TrackedContainers {
 	containers := containerFn(config)
 
@@ -47,39 +106,18 @@ func GetContainers(config Config, repoWithRegistryMap DomainConfiguredRegistryMa
 		return strings.Compare(a.Name, b.Name)
 	})
 
-	trackedContainers := make(TrackedContainers, len(containers))
-	for idx, ctr := range containers {
-		parsed, _ := reference.ParseDockerRef(ctr.Image)
-		domain := reference.Domain(parsed)
-		path := reference.Path(parsed)
-		tag := strings.Split(parsed.String(), ":")[1]
-		includeLabel := ""
-		transformLabel := ""
-		if label, ok := ctr.Labels["wud.tag.include"]; ok {
-			includeLabel = label
-		}
-		if label, ok := ctr.Labels["wud.tag.transform"]; ok {
-			transformLabel = label
-		}
-		tracked := false
-		if _, foundInConfig := repoWithRegistryMap[domain]; foundInConfig {
-			tracked = true
-		}
+	// trackedContainers := make(TrackedContainers, len(containers))
+	trackedContainers := TrackedContainers{}
+	for _, ctr := range containers {
+		trackedContainer := getTrackedContainer(ctr, repoWithRegistryMap)
+		trackedContainers = append(trackedContainers, trackedContainer)
 
-		trackedContainers[idx] = TrackedContainer{
-			Name:    ctr.Name,
-			Tracked: tracked,
-			Labels: ContainerLabels{
-				Include:   includeLabel,
-				Transform: transformLabel,
-			},
-			Image: ContainerImage{
-				Path:   path,
-				Tag:    tag,
-				Domain: domain,
-			},
+		if label, ok := ctr.Labels["contrack.parent.image"]; ok {
+			parentContainer := getTrackedParentContainer(ctr, label, repoWithRegistryMap)
+			trackedContainers = append(trackedContainers, parentContainer)
 		}
 	}
+
 	return trackedContainers
 }
 
