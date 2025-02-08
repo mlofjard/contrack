@@ -12,6 +12,10 @@ platforms=(
 	"windows/amd64"
 )
 
+mkdir -p release
+cp LICENSE release/
+GOFLAGS="-tags=tool" go-licenses save github.com/mlofjard/contrack --ignore github.com/mlofjard/contrack --save_path ./release/dep-licenses
+
 for platform in "${platforms[@]}"; do
 	platform_split=(${platform//\// })
 	GOOS=${platform_split[0]}
@@ -39,11 +43,11 @@ for platform in "${platforms[@]}"; do
 	zip_name="contrack-${version}-${os}-${GOARCH}"
 	pushd release >/dev/null
 	if [ $os = "windows" ]; then
-		zip $zip_name.zip $output_name
-		rm $output_name
+		zip $zip_name.zip $output_name LICENSE dep-licenses
 	else
 		chmod a+x $output_name
-		gzip $output_name
+		tar zcvf $output_name.tar.gz $output_name LICENSE dep-licenses
 	fi
+	rm $output_name
 	popd >/dev/null
 done
