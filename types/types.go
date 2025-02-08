@@ -1,16 +1,20 @@
-package types
+/*
+Copyright © 2025 Mikael Lofjärd <mikael@lofjard.se>
 
-type CommandFlags struct {
-	ConfigPathPtr *string
-	DebugPtr      *bool
-	MockPtr       *string
-	ColumnsPtr    *string
-	HostPtr       *string
-	IncludeAllPtr *bool
-	NoProgressPtr *bool
-	VersionPtr    *bool
-	HelpPtr       *bool
-}
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program. If not, see <http://www.gnu.org/licenses/>.
+*/
+package types
 
 type AuthType struct {
 	int
@@ -65,7 +69,7 @@ type ContainerLabels struct {
 	Transform string
 }
 
-type ConfigFileReaderFn = func(*CommandFlags) []byte
+type ConfigFileReaderFn = func(string) []byte
 
 type ContainerDiscoveryFn = func(Config) []Container
 

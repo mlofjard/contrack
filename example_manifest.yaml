@@ -1,0 +1,8 @@
+---
+docker.io/library/nginx:1.2.3-alpine:
+  include: "^\\d+\\.\\d+\\.\\d+.*$"
+  transform: "^(\\d+\\.\\d+\\.\\d+).*$ => $1"
+lscr.io/linuxserver/radarr:1.2.3-ls1:
+  include: "^\\d+\\.\\d+\\.\\d+.*$"
+  transform: "^(\\d+\\.\\d+\\.\\d+).*$ => $1"
+

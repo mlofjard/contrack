@@ -30,4 +30,6 @@ go.work.sum
 /release
 # config
 /config.yaml
+# cobra
+/.cobra.yaml
 
