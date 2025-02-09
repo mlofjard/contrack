@@ -24,6 +24,8 @@ import (
 	"os"
 	"strings"
 
+	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
 	"github.com/mlofjard/contrack/registry"
@@ -47,44 +49,29 @@ func FileReaderFunc(configPath string) []byte {
 	return data
 }
 
-func ParseConfigFile(domainConfiguredRegistryMap DomainConfiguredRegistryMap, fileReaderFn ConfigFileReaderFn) Config {
+func ParseConfigFile(flagSet *pflag.FlagSet, domainConfiguredRegistryMap DomainConfiguredRegistryMap, fileReaderFn ConfigFileReaderFn) Config {
 	// data := fileReaderFn(cliContext.String("config"))
 	debug := func(a ...any) {
 		if viper.GetBool("debug") {
-			fmt.Print("CONFIG ")
+			fmt.Print("CONFIG: ")
 			fmt.Println(a...)
 		}
 	}
 
 	// Default values
-	config := Config{
-		Debug:      false,
-		NoProgress: false,
-		Host:       "unix:///var/run/docker/docker.sock",
-		Columns:    []string{"status", "container", "repository", "tag", "update"},
-	}
+	config := Config{}
+	viper.SetDefault("debug", false)
+	viper.SetDefault("noProgress", false)
+	viper.SetDefault("includeStopped", false)
+	viper.SetDefault("host", "unix:///var/run/docker/docker.sock")
+	viper.SetDefault("columns", []string{"status", "container", "repository", "tag", "update"})
 
-	// Override from config
-	if viper.InConfig("debug") {
-		debug("Found Debug in config file")
-		config.Debug = viper.GetBool("debug")
-	}
-	if viper.InConfig("noProgress") {
-		debug("Found NoProgress in config file")
-		config.NoProgress = viper.GetBool("noProgress")
-	}
-	if viper.InConfig("host") {
-		debug("Found Host in config file")
-		config.Host = viper.GetString("host")
-	}
-	if viper.InConfig("includeStopped") {
-		debug("Found IncludeStopped in config file")
-		config.IncludeAll = viper.GetBool("includeStopped")
-	}
-	if viper.InConfig("columns") {
-		debug("Found Columns in config file")
-		config.Columns = viper.GetStringSlice("columns")
-	}
+	// Load from viper (default, config, env, flags)
+	config.Debug = viper.GetBool("debug")
+	config.NoProgress = viper.GetBool("noProgress")
+	config.Host = viper.GetString("host")
+	config.IncludeAll = viper.GetBool("includeStopped")
+	config.Columns = viper.GetStringSlice("columns")
 
 	var configRegisitries map[string]configRegistry
 	viper.UnmarshalKey("registries", &configRegisitries)
@@ -92,31 +79,21 @@ func ParseConfigFile(domainConfiguredRegistryMap DomainConfiguredRegistryMap, fi
 	// Iterate over config and map registries
 	for registryName, cfgReg := range configRegisitries {
 		normalizedUrl := cfgReg.Domain
-		if config.Debug {
-			fmt.Println(" ** Pre normalized url", normalizedUrl)
-		}
+		debug(" ** Pre normalized url", normalizedUrl)
 		if strings.Index(cfgReg.Domain, "https://") == -1 {
 			normalizedUrl = fmt.Sprintf("https://%s/v2", cfgReg.Domain)
 		}
 
-		if config.Debug {
-			fmt.Println("cfgRepo auth", cfgReg.Auth)
-		}
+		debug("cfgRepo auth", cfgReg.Auth)
 		authType := AuthTypes.None
 		if cfgReg.Auth != nil {
-			if config.Debug {
-				fmt.Println("authtype not nil")
-			}
+			debug("authtype not nil")
 			switch *cfgReg.Auth {
 			case "basic":
-				if config.Debug {
-					fmt.Println("authtype switch basic")
-				}
+				debug("authtype switch basic")
 				authType = AuthTypes.Basic
 			case "bearer":
-				if config.Debug {
-					fmt.Println("authtype switch bearer")
-				}
+				debug("authtype switch bearer")
 				authType = AuthTypes.Bearer
 			}
 		}
@@ -153,9 +130,10 @@ func ParseConfigFile(domainConfiguredRegistryMap DomainConfiguredRegistryMap, fi
 		}
 	}
 
-	if config.Debug {
-		fmt.Println("repo map", domainConfiguredRegistryMap)
-	}
+	debug("repo map", domainConfiguredRegistryMap)
+
+	err := config.Validate()
+	cobra.CheckErr(err)
 
 	return config
 }

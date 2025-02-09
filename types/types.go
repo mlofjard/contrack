@@ -16,6 +16,13 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 package types
 
+import (
+	"errors"
+	"fmt"
+	"slices"
+	"strings"
+)
+
 type AuthType struct {
 	int
 	Scheme string
@@ -35,6 +42,34 @@ type Config struct {
 	Host       string
 	Columns    []string
 }
+
+var ColumnSpec = map[string]string{
+	"container":  "The container name",
+	"status":     "Short processing status (OK/ERR)",
+	"detail":     "Long processing status error explaination",
+	"repository": "Repository (<domain>/<path>)",
+	"image":      "Image (<domain>/<path>:<tag>)",
+	"domain":     "Image domain",
+	"path":       "Image path",
+	"tag":        "Image tag",
+	"update":     "Newer tag found",
+}
+
+func (c Config) Validate() error {
+	// Validate Columns against spec
+	var invalidCol = ""
+	if invalid := slices.ContainsFunc(c.Columns, func(e string) bool {
+		if _, ok := ColumnSpec[strings.ToLower(e)]; !ok {
+			invalidCol = strings.ToLower(e)
+			return true
+		}
+		return false
+	}); invalid {
+		return errors.New(fmt.Sprintf("Invalid column '%s' found", invalidCol))
+	}
+	return nil
+}
+
 type DomainConfiguredRegistryMap = map[string]ConfiguredRegistry
 
 type ConfiguredRegistry struct {

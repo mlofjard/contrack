@@ -2,6 +2,8 @@
 
 github_tag=$(git describe --tags HEAD)
 version=$(echo -e $github_tag | sed -e 's/^v//')
+buildtime=$(date +"%a %b %d %H:%M:%S %Y")
+gitcommit=$(git log -n1 --pretty=%H)
 
 platforms=(
 	"darwin/amd64"
@@ -33,7 +35,7 @@ for platform in "${platforms[@]}"; do
 
 	echo "Building release/$output_name..."
 	env GOOS=$GOOS GOARCH=$GOARCH CGO_ENABLED=0 go build \
-		-ldflags "-X github.com/mlofjard/contrack/command.Version=$version" \
+		-ldflags "-X 'github.com/mlofjard/contrack/cmd.Version=${version}' -X 'github.com/mlofjard/contrack/cmd.OSArch=${platform}' -X 'github.com/mlofjard/contrack/cmd.GitCommit=${gitcommit}' -X 'github.com/mlofjard/contrack/cmd.BuildTime=${buildtime}'" \
 		-o release/$output_name
 	if [ $? -ne 0 ]; then
 		echo 'An error has occurred! Aborting.'

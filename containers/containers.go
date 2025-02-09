@@ -28,6 +28,7 @@ import (
 
 	"github.com/Masterminds/semver"
 	. "github.com/mlofjard/contrack/types"
+	"github.com/spf13/cobra"
 
 	"github.com/distribution/reference"
 	apiContainer "github.com/docker/docker/api/types/container"
@@ -37,16 +38,12 @@ import (
 func DiscoveryFunc(config Config) []Container {
 	// Setup docker API client
 	client, err := apiClient.NewClientWithOpts(apiClient.WithHost(config.Host))
-	if err != nil {
-		panic(err)
-	}
+	cobra.CheckErr(err)
 	defer client.Close()
 
 	// Fetch list on containers
 	containers, err := client.ContainerList(context.Background(), apiContainer.ListOptions{All: config.IncludeAll})
-	if err != nil {
-		panic(err)
-	}
+	cobra.CheckErr(err)
 
 	result := make([]Container, len(containers))
 	for idx, ctr := range containers {
@@ -168,17 +165,22 @@ func GroupContainers(config Config, domainGroupedRepoMap DomainGroupedRepoMap, d
 func mapOutput(columns []string, outputMap map[string]string) []any {
 	var output = make([]any, len(columns))
 	for idx, column := range columns {
-		output[idx] = outputMap[column]
+		output[idx] = outputMap[strings.ToLower(column)]
 	}
 	return output
 }
 
 func ProcessTrackedContainers(config Config, imageTagMap ImageTagMap, trackedContainers TrackedContainers) {
-	semverMin, _ := semver.NewVersion("0.0.0-0")
-	if config.Debug {
-		fmt.Println("Number of containers tracked:", len(trackedContainers))
-		fmt.Println("Imagetagmap", imageTagMap)
+	debug := func(a ...any) {
+		if config.Debug {
+			fmt.Print("CONTAINERS: ")
+			fmt.Println(a...)
+		}
 	}
+
+	semverMin, _ := semver.NewVersion("0.0.0-0")
+	debug("Number of containers tracked:", len(trackedContainers))
+	debug("Imagetagmap", imageTagMap)
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 
@@ -197,12 +199,10 @@ func ProcessTrackedContainers(config Config, imageTagMap ImageTagMap, trackedCon
 			image := ctr.Image
 			repository := fmt.Sprintf("%s/%s", image.Domain, image.Path)
 			imageStr := fmt.Sprintf("%s:%s", repository, image.Tag)
-			if config.Debug {
-				fmt.Println("**** Name:", ctr.Name)
-				fmt.Println("**** Image:", image.Path)
-				fmt.Println("**** Include:", ctr.Labels.Include)
-				fmt.Println("**** Transform:", ctr.Labels.Transform)
-			}
+			debug("**** Name:", ctr.Name)
+			debug("**** Image:", image.Path)
+			debug("**** Include:", ctr.Labels.Include)
+			debug("**** Transform:", ctr.Labels.Transform)
 
 			output[idx] = make(map[string]string)
 			output[idx]["status"] = "OK"
@@ -237,9 +237,7 @@ func ProcessTrackedContainers(config Config, imageTagMap ImageTagMap, trackedCon
 						transformedTag = transformRegex.ReplaceAllString(image.Tag, strings.TrimSpace(replaceSplit[1]))
 					}
 
-					if config.Debug {
-						fmt.Println("**** > Transformed tag:", transformedTag)
-					}
+					debug("**** > Transformed tag:", transformedTag)
 
 					localSemver, err := semver.NewVersion(transformedTag)
 					if err != nil {
@@ -251,9 +249,7 @@ func ProcessTrackedContainers(config Config, imageTagMap ImageTagMap, trackedCon
 
 					filteredTags := slices.DeleteFunc(slices.Clone(imageTags.Tags), func(t string) bool { return !includeRegex.MatchString(t) })
 
-					if config.Debug {
-						fmt.Printf("**** > Filtered tags: %d\n", len(filteredTags))
-					}
+					debug("**** > Filtered tags:", len(filteredTags))
 
 					transformedTags := make([]string, len(filteredTags))
 					semverTags := make([]*semver.Version, len(filteredTags))
@@ -274,9 +270,7 @@ func ProcessTrackedContainers(config Config, imageTagMap ImageTagMap, trackedCon
 						semverFilteredMap[v.String()] = filteredTags[i] // this works because filteredTags is same length as transformedTags
 					}
 
-					if config.Debug {
-						fmt.Printf("**** > Transformed tags: %d\n", len(transformedTags))
-					}
+					debug("**** > Transformed tags:", len(transformedTags))
 
 					sort.Sort(semver.Collection(semverTags))
 					latestSemver := semverMin

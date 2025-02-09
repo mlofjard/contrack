@@ -18,11 +18,13 @@ package registry
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"slices"
 
 	. "github.com/mlofjard/contrack/types"
+	"github.com/spf13/cobra"
 
 	"github.com/go-resty/resty/v2"
 	p "github.com/schollz/progressbar/v3"
@@ -123,13 +125,10 @@ func DigestFetcherFunc(regUrl string, authType AuthType, authToken string, image
 		resp, err = client.R().
 			Get(url)
 
-		if err != nil {
-			panic(err)
-			return -1
-		}
+		cobra.CheckErr(err)
+
 		if resp.StatusCode() != 200 {
-			panic(resp.Status())
-			return resp.StatusCode()
+			cobra.CheckErr(errors.New(fmt.Sprintf("Status code %d was returned", resp.StatusCode())))
 		}
 		blob := &blobResponse{}
 		json.Unmarshal(resp.Body(), blob)
@@ -140,6 +139,13 @@ func DigestFetcherFunc(regUrl string, authType AuthType, authToken string, image
 }
 
 func FetchTags(config Config, imageTagMap ImageTagMap, domainGroupedRepoMap DomainGroupedRepoMap, domainConfiguredRegistryMap DomainConfiguredRegistryMap, imageCount int, fetcherFn RegistryTagFetcherFn) {
+	debug := func(f string, a ...any) {
+		if config.Debug {
+			fmt.Print("REGISTRY: ")
+			fmt.Printf(f, a...)
+		}
+	}
+
 	bar := p.NewOptions(imageCount,
 		p.OptionSetWriter(os.Stdout),
 		p.OptionClearOnFinish(),
@@ -151,9 +157,7 @@ func FetchTags(config Config, imageTagMap ImageTagMap, domainGroupedRepoMap Doma
 	)
 
 	for domain, groupedRepo := range domainGroupedRepoMap {
-		if config.Debug {
-			fmt.Printf("Domain: %s, Images: %d\n", domain, len(groupedRepo.Paths))
-		}
+		debug("Domain: %s, Images: %d\n", domain, len(groupedRepo.Paths))
 
 		authType := AuthTypes.None
 		authToken := ""
@@ -161,9 +165,7 @@ func FetchTags(config Config, imageTagMap ImageTagMap, domainGroupedRepoMap Doma
 
 			reg := configuredRegistry.Registry
 
-			if config.Debug {
-				fmt.Printf("Registry found with url: %s\n", reg.GetUrl())
-			}
+			debug("Registry found with url: %s\n", reg.GetUrl())
 
 			regUrl := reg.GetUrl()
 			token, regAuthType := reg.GetAuth(groupedRepo, configuredRegistry.AuthType, configuredRegistry.AuthToken)
@@ -182,9 +184,7 @@ func FetchTags(config Config, imageTagMap ImageTagMap, domainGroupedRepoMap Doma
 				bar.Add(1)
 			}
 		} else {
-			if config.Debug {
-				fmt.Printf("Registry NOT found: %s\n", groupedRepo.Domain)
-			}
+			debug("Registry NOT found: %s\n", groupedRepo.Domain)
 		}
 	}
 }

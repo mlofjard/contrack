@@ -23,8 +23,6 @@ import (
 	"github.com/spf13/pflag"
 )
 
-var Version = "dev-build"
-
 type multiValueFlags []string
 
 func (i multiValueFlags) Has(s string) bool {

@@ -19,14 +19,14 @@ package cmd
 import (
 	"fmt"
 
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
+
 	"github.com/mlofjard/contrack/command"
 	"github.com/mlofjard/contrack/configuration"
 	"github.com/mlofjard/contrack/containers"
 	"github.com/mlofjard/contrack/mocks"
 	"github.com/mlofjard/contrack/registry"
-	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
-
 	. "github.com/mlofjard/contrack/types"
 )
 
@@ -37,22 +37,10 @@ func toggleMock[K ConfigFileReaderFn | ContainerDiscoveryFn | RegistryTagFetcher
 	return realFn
 }
 
-// trackCmd represents the track command
 var trackCmd = &cobra.Command{
 	Use:   "track",
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+	Short: "Track container image tags to discover new versions",
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("track called")
-		fmt.Println("config debug", viper.GetBool("debug"))
-		fmt.Println("config columns", viper.GetStringSlice("columns"))
-		fmt.Println("config includeStopped", viper.GetBool("includeStopped"))
-
 		// Setup and parse command flags
 		mockFlags := command.SetupCommandline(cmd.Flags())
 		configFileReaderFn := toggleMock(mockFlags.Has("config"), mocks.ConfigFileReaderFunc, configuration.FileReaderFunc)
@@ -62,7 +50,7 @@ to quickly create a Cobra application.`,
 		// Parse config file to domain -> repo map
 		domainConfiguredRegistryMap := make(DomainConfiguredRegistryMap)
 		var config Config
-		config = configuration.ParseConfigFile(domainConfiguredRegistryMap, configFileReaderFn)
+		config = configuration.ParseConfigFile(cmd.Flags(), domainConfiguredRegistryMap, configFileReaderFn)
 
 		// Process containers and get domain -> grouped by repo map
 		var trackedContainers TrackedContainers
@@ -78,7 +66,6 @@ to quickly create a Cobra application.`,
 
 		// Process container image versions and print
 		containers.ProcessTrackedContainers(config, imageTagMap, trackedContainers)
-
 	},
 }
 
@@ -86,20 +73,33 @@ func init() {
 	rootCmd.AddCommand(trackCmd)
 
 	trackCmd.Flags().StringSlice("mock", nil, "")
+	trackCmd.Flags().Lookup("mock").Hidden = true
 
-	trackCmd.Flags().StringSliceP("columns", "c", nil, "Set columns to use for output. See COLUMNSPEC")
+	trackCmd.Flags().StringSliceP("columns", "c", nil, "Set columns to use for output. See Column Specification")
 	viper.BindPFlag("columns", trackCmd.Flags().Lookup("columns"))
 
 	trackCmd.Flags().BoolP("include-all", "a", false, "Include stopped containers")
 	viper.BindPFlag("includeStopped", trackCmd.Flags().Lookup("include-all"))
 
-	// Here you will define your flags and configuration settings.
+	trackCmd.Flags().BoolP("no-progress", "n", false, "Hide progress bar")
+	viper.BindPFlag("noProgress", trackCmd.Flags().Lookup("no-progress"))
 
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// trackCmd.PersistentFlags().String("foo", "", "A help for foo")
+	trackCmd.Flags().StringP("host", "h", "", "Docker host")
 
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// trackCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	trackCmd.Flags().Bool("help", false, "Print help (this message) and exit")
+
+	trackCmd.SetHelpTemplate(fmt.Sprintf("%s\n%s", trackCmd.HelpTemplate(), `Column Specification:
+  A comma separated line of column names
+  Example: contrack track -c status,image,update
+
+  container    The container name
+  status       Short processing status (OK/ERR)
+  detail       Detailed status error explaination
+  repository   Repository (<domain>/<path>)
+  image        Image (<domain>/<path>:<tag>)
+  domain       Image domain
+  path         Image path
+  tag          Image tag
+  update       Newer tag found
+`))
 }

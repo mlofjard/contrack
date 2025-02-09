@@ -25,20 +25,4 @@ import (
 func main() {
 	cmd.Execute()
 	os.Exit(0)
-
-	// `COLUMNSPEC:
-	//
-	//	A comma separated line of column names
-	//
-	//	container            The container name
-	//	status               Short processing status (OK/ERR)
-	//	detail               Long processing status error explaination
-	//	repository           Repository (<domain>/<path>)
-	//	image                Image (<domain>/<path>:<tag>)
-	//	domain               Image domain
-	//	path                 Image path
-	//	tag                  Image tag
-	//	update               Newer tag found
-	//
-	// `
 }
