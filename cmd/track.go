@@ -19,6 +19,7 @@ package cmd
 import (
 	"fmt"
 
+	"github.com/charmbracelet/glamour"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
@@ -37,54 +38,53 @@ func toggleMock[K ConfigFileReaderFn | ContainerDiscoveryFn | RegistryTagFetcher
 	return realFn
 }
 
-var trackCmd = &cobra.Command{
-	Use:   "track",
-	Short: "Track container image tags to discover new versions",
-	Run: func(cmd *cobra.Command, args []string) {
-		// Setup and parse command flags
-		mockFlags := command.SetupCommandline(cmd.Flags())
-		configFileReaderFn := toggleMock(mockFlags.Has("config"), mocks.ConfigFileReaderFunc, configuration.FileReaderFunc)
-		containerDiscoveryFn := toggleMock(mockFlags.Has("containers"), mocks.ContainerDiscoveryFunc, containers.DiscoveryFunc)
-		registryTagFetcherFn := toggleMock(mockFlags.Has("registry"), mocks.RegistryTagFetcherFunc, registry.TagFetcherFunc)
+func NewTrackCommand(rootViper *viper.Viper, renderer *glamour.TermRenderer) *cobra.Command {
+	var trackCmd = &cobra.Command{
+		Use:   "track",
+		Short: "Track container image tags to discover new versions",
+		Run: func(cmd *cobra.Command, args []string) {
+			// Setup and parse command flags
+			mockFlags := command.SetupCommandline(cmd.Flags())
+			configFileReaderFn := toggleMock(mockFlags.Has("config"), mocks.ConfigFileReaderFunc, configuration.FileReaderFunc)
+			containerDiscoveryFn := toggleMock(mockFlags.Has("containers"), mocks.ContainerDiscoveryFunc, containers.DiscoveryFunc)
+			registryTagFetcherFn := toggleMock(mockFlags.Has("registry"), mocks.RegistryTagFetcherFunc, registry.TagFetcherFunc)
 
-		// Parse config file to domain -> repo map
-		domainConfiguredRegistryMap := make(DomainConfiguredRegistryMap)
-		var config Config
-		config = configuration.ParseConfigFile(cmd.Flags(), domainConfiguredRegistryMap, configFileReaderFn)
+			// Parse config file to domain -> repo map
+			domainConfiguredRegistryMap := make(DomainConfiguredRegistryMap)
+			var config Config
+			config = configuration.ParseConfigFile(rootViper, domainConfiguredRegistryMap, configFileReaderFn)
 
-		// Process containers and get domain -> grouped by repo map
-		var trackedContainers TrackedContainers
-		trackedContainers = containers.GetContainers(config, domainConfiguredRegistryMap, containerDiscoveryFn)
+			// Process containers and get domain -> grouped by repo map
+			var trackedContainers TrackedContainers
+			trackedContainers = containers.GetContainers(config, domainConfiguredRegistryMap, containerDiscoveryFn)
 
-		// Group containers by repo
-		domainGroupedRepoMap := make(DomainGroupedRepoMap, len(domainConfiguredRegistryMap))
-		uniqueImagesCount := containers.GroupContainers(config, domainGroupedRepoMap, domainConfiguredRegistryMap, trackedContainers)
+			// Group containers by repo
+			domainGroupedRepoMap := make(DomainGroupedRepoMap, len(domainConfiguredRegistryMap))
+			uniqueImagesCount := containers.GroupContainers(config, domainGroupedRepoMap, domainConfiguredRegistryMap, trackedContainers)
 
-		// Fetch tags for all unique images
-		imageTagMap := make(ImageTagMap, uniqueImagesCount)
-		registry.FetchTags(config, imageTagMap, domainGroupedRepoMap, domainConfiguredRegistryMap, uniqueImagesCount, registryTagFetcherFn)
+			// Fetch tags for all unique images
+			imageTagMap := make(ImageTagMap, uniqueImagesCount)
+			registry.FetchTags(config, imageTagMap, domainGroupedRepoMap, domainConfiguredRegistryMap, uniqueImagesCount, registryTagFetcherFn)
 
-		// Process container image versions and print
-		containers.ProcessTrackedContainers(config, imageTagMap, trackedContainers)
-	},
-}
+			// Process container image versions and print
+			containers.ProcessTrackedContainers(config, imageTagMap, trackedContainers)
+		},
+	}
 
-func init() {
-	rootCmd.AddCommand(trackCmd)
-
+	// Setup flags
 	trackCmd.Flags().StringSlice("mock", nil, "")
 	trackCmd.Flags().Lookup("mock").Hidden = true
 
 	trackCmd.Flags().StringSliceP("columns", "c", nil, "Set columns to use for output. See Column Specification")
-	viper.BindPFlag("columns", trackCmd.Flags().Lookup("columns"))
+	rootViper.BindPFlag("columns", trackCmd.Flags().Lookup("columns"))
 
 	trackCmd.Flags().BoolP("include-all", "a", false, "Include stopped containers")
-	viper.BindPFlag("includeStopped", trackCmd.Flags().Lookup("include-all"))
+	rootViper.BindPFlag("includeStopped", trackCmd.Flags().Lookup("include-all"))
 
 	trackCmd.Flags().BoolP("no-progress", "n", false, "Hide progress bar")
-	viper.BindPFlag("noProgress", trackCmd.Flags().Lookup("no-progress"))
+	rootViper.BindPFlag("noProgress", trackCmd.Flags().Lookup("no-progress"))
 
-	trackCmd.Flags().StringP("host", "h", "", "Docker host")
+	trackCmd.Flags().StringP("host", "h", "unix:///var/run/docker/docker.sock", "Set docker/podman host")
 
 	trackCmd.Flags().Bool("help", false, "Print help (this message) and exit")
 
@@ -102,4 +102,6 @@ func init() {
   tag          Image tag
   update       Newer tag found
 `))
+
+	return trackCmd
 }

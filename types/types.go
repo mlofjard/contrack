@@ -117,6 +117,11 @@ type GroupedRepository struct {
 	Paths  []string
 }
 
+type Help struct {
+	Long    string
+	Example string
+}
+
 type Registry interface {
 	GetAuth(GroupedRepository, AuthType, string) (string, AuthType)
 	GetUrl() string

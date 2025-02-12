@@ -17,70 +17,97 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 package cmd
 
 import (
+	_ "embed"
 	"fmt"
 	"os"
 	"path/filepath"
 
+	"github.com/charmbracelet/glamour"
+	"github.com/muesli/termenv"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+
+	"github.com/mlofjard/contrack/utils"
 )
+
+//go:embed helpstyle.json
+var helpStyle string
+
+//go:embed root.md
+var rootMarkdown string
 
 var cfgFile string
 
-var rootCmd = &cobra.Command{
-	Version: Version,
-	Use:     "contrack",
-	Short:   "Manage your container image tags",
-	Long: `Contrack can check running or predefined containers against their
-registries to find out if newer versions has been published.
-It can also prune your own repositories of digests older than
-a specified number of days, or just keep a set number of the latest
-tags.`,
+func NewRootCommand(rootViper *viper.Viper, renderer *glamour.TermRenderer) *cobra.Command {
+	help := utils.ParseHelp(renderer, rootMarkdown)
+	var rootCmd = &cobra.Command{
+		Version: Version,
+		Use:     "contrack",
+		Short:   "Manage your container image tags",
+		Long:    help.Long,
+	}
+
+	cobra.OnInitialize(initConfig(rootViper, rootCmd))
+
+	// Setup flags
+	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "$XDG_CONFIG_HOME/contrack/config.yaml", "Config file")
+
+	rootCmd.PersistentFlags().BoolP("debug", "d", false, "Enable debug output")
+	rootViper.BindPFlag("debug", rootCmd.PersistentFlags().Lookup("debug"))
+
+	rootCmd.Flags().Bool("help", false, "Print help (this message) and exit")
+	rootCmd.Flags().Bool("version", false, "Print version information and exit")
+
+	// Add commands
+	rootCmd.AddCommand(NewTrackCommand(rootViper, renderer))
+	rootCmd.AddCommand(NewPruneCommand(rootViper, renderer))
+	rootCmd.AddCommand(NewVersionCommand(rootViper, renderer))
+	return rootCmd
 }
 
 func Execute() {
-	err := rootCmd.Execute()
+	rootViper := viper.New()
+
+	renderer, err := glamour.NewTermRenderer(
+		// glamour.WithStandardStyle("dracula"),
+		glamour.WithStylesFromJSONBytes([]byte(helpStyle)),
+		glamour.WithColorProfile(termenv.ANSI),
+		glamour.WithWordWrap(68),
+	)
+	utils.HandleErr(err)
+
+	err = NewRootCommand(rootViper, renderer).Execute()
 	if err != nil {
 		os.Exit(1)
 	}
 }
 
-func init() {
-	cobra.OnInitialize(initConfig)
+func initConfig(rootViper *viper.Viper, rootCmd *cobra.Command) func() {
+	return func() {
+		if rootCmd.Flag("config").Changed {
+			// Use config file from the flag.
+			rootViper.SetConfigFile(cfgFile)
+		} else {
+			// Find user config directory.
+			configPath, err := os.UserConfigDir()
+			cobra.CheckErr(err)
+			contrackConfigPath := filepath.Join(configPath, "contrack")
 
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "Config file (default is $XDG_CONFIG_HOME/contrack/config.yaml)")
+			// Find config file
+			rootViper.AddConfigPath(contrackConfigPath)
+			rootViper.SetConfigType("yaml")
+			rootViper.SetConfigName("config")
+		}
 
-	rootCmd.PersistentFlags().BoolP("debug", "d", false, "Enable debug output")
-	viper.BindPFlag("debug", rootCmd.PersistentFlags().Lookup("debug"))
+		// read in environment variables that match
+		rootViper.SetEnvPrefix("ct")
+		rootViper.AutomaticEnv()
 
-	rootCmd.Flags().Bool("help", false, "Print help (this message) and exit")
-	rootCmd.Flags().Bool("version", false, "Print version information and exit")
-}
-
-func initConfig() {
-	if cfgFile != "" {
-		// Use config file from the flag.
-		viper.SetConfigFile(cfgFile)
-	} else {
-		// Find user config directory.
-		configPath, err := os.UserConfigDir()
-		cobra.CheckErr(err)
-		contrackConfigPath := filepath.Join(configPath, "contrack")
-
-		// Find config file
-		viper.AddConfigPath(contrackConfigPath)
-		viper.SetConfigType("yaml")
-		viper.SetConfigName("config")
-	}
-
-	// read in environment variables that match
-	viper.SetEnvPrefix("ct")
-	viper.AutomaticEnv()
-
-	// If a config file is found, read it in.
-	if err := viper.ReadInConfig(); err == nil {
-		if debug, err := rootCmd.Flags().GetBool("debug"); debug && err == nil {
-			fmt.Fprintln(os.Stderr, "ROOT: Using config file:", viper.ConfigFileUsed())
+		// If a config file is found, read it in.
+		if err := rootViper.ReadInConfig(); err == nil {
+			if debug, err := rootCmd.Flags().GetBool("debug"); debug && err == nil {
+				fmt.Println("ROOT: Using config file:", rootViper.ConfigFileUsed())
+			}
 		}
 	}
 }

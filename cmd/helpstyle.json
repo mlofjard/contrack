@@ -1,0 +1,37 @@
+{
+  "document": {
+    "block_prefix": "\n",
+    "margin": 2
+  },
+  "heading": {
+    "block_suffix": "\n",
+    "color": "3",
+    "bold": true
+  },
+  "h1": {
+    "prefix": " ",
+    "suffix": " ",
+    "color": "0",
+    "background_color": "3",
+    "bold": true
+  },
+  "hr": {
+    "color": "2",
+    "format": "\n---------\n"
+  },
+  "link": {
+    "color": "99",
+    "underline": true
+  },
+  "link_text": {
+    "bold": true
+  },
+  "code": {
+    "color": "5"
+  },
+  "code_block": {
+    "margin": 2,
+    "color": "5",
+    "prefix": "$ "
+  }
+}

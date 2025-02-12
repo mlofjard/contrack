@@ -24,12 +24,11 @@ import (
 	"os"
 	"strings"
 
-	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
 	"github.com/mlofjard/contrack/registry"
 	. "github.com/mlofjard/contrack/types"
+	"github.com/mlofjard/contrack/utils"
 )
 
 type configRegistry struct {
@@ -49,10 +48,10 @@ func FileReaderFunc(configPath string) []byte {
 	return data
 }
 
-func ParseConfigFile(flagSet *pflag.FlagSet, domainConfiguredRegistryMap DomainConfiguredRegistryMap, fileReaderFn ConfigFileReaderFn) Config {
+func ParseConfigFile(cfgViper *viper.Viper, domainConfiguredRegistryMap DomainConfiguredRegistryMap, fileReaderFn ConfigFileReaderFn) Config {
 	// data := fileReaderFn(cliContext.String("config"))
 	debug := func(a ...any) {
-		if viper.GetBool("debug") {
+		if cfgViper.GetBool("debug") {
 			fmt.Print("CONFIG: ")
 			fmt.Println(a...)
 		}
@@ -60,21 +59,21 @@ func ParseConfigFile(flagSet *pflag.FlagSet, domainConfiguredRegistryMap DomainC
 
 	// Default values
 	config := Config{}
-	viper.SetDefault("debug", false)
-	viper.SetDefault("noProgress", false)
-	viper.SetDefault("includeStopped", false)
-	viper.SetDefault("host", "unix:///var/run/docker/docker.sock")
-	viper.SetDefault("columns", []string{"status", "container", "repository", "tag", "update"})
+	cfgViper.SetDefault("debug", false)
+	cfgViper.SetDefault("noProgress", false)
+	cfgViper.SetDefault("includeStopped", false)
+	cfgViper.SetDefault("host", "unix:///var/run/docker/docker.sock")
+	cfgViper.SetDefault("columns", []string{"status", "container", "repository", "tag", "update"})
 
 	// Load from viper (default, config, env, flags)
-	config.Debug = viper.GetBool("debug")
-	config.NoProgress = viper.GetBool("noProgress")
-	config.Host = viper.GetString("host")
-	config.IncludeAll = viper.GetBool("includeStopped")
-	config.Columns = viper.GetStringSlice("columns")
+	config.Debug = cfgViper.GetBool("debug")
+	config.NoProgress = cfgViper.GetBool("noProgress")
+	config.Host = cfgViper.GetString("host")
+	config.IncludeAll = cfgViper.GetBool("includeStopped")
+	config.Columns = cfgViper.GetStringSlice("columns")
 
 	var configRegisitries map[string]configRegistry
-	viper.UnmarshalKey("registries", &configRegisitries)
+	cfgViper.UnmarshalKey("registries", &configRegisitries)
 
 	// Iterate over config and map registries
 	for registryName, cfgReg := range configRegisitries {
@@ -133,7 +132,7 @@ func ParseConfigFile(flagSet *pflag.FlagSet, domainConfiguredRegistryMap DomainC
 	debug("repo map", domainConfiguredRegistryMap)
 
 	err := config.Validate()
-	cobra.CheckErr(err)
+	utils.HandleErr(err)
 
 	return config
 }

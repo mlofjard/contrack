@@ -17,7 +17,6 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 package containers
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"regexp"
@@ -27,38 +26,15 @@ import (
 	"text/tabwriter"
 
 	"github.com/Masterminds/semver"
-	. "github.com/mlofjard/contrack/types"
-	"github.com/spf13/cobra"
 
-	"github.com/distribution/reference"
-	apiContainer "github.com/docker/docker/api/types/container"
-	apiClient "github.com/docker/docker/client"
+	. "github.com/mlofjard/contrack/types"
+	"github.com/mlofjard/contrack/utils"
 )
 
-func DiscoveryFunc(config Config) []Container {
-	// Setup docker API client
-	client, err := apiClient.NewClientWithOpts(apiClient.WithHost(config.Host))
-	cobra.CheckErr(err)
-	defer client.Close()
-
-	// Fetch list on containers
-	containers, err := client.ContainerList(context.Background(), apiContainer.ListOptions{All: config.IncludeAll})
-	cobra.CheckErr(err)
-
-	result := make([]Container, len(containers))
-	for idx, ctr := range containers {
-		result[idx] = Container{Name: strings.TrimPrefix(ctr.Names[0], "/"), Image: ctr.Image, Labels: ctr.Labels}
-	}
-	return result
-}
-
 func createTrackedContainer(name string, image string, include string, transform string, repoWithRegistryMap DomainConfiguredRegistryMap) TrackedContainer {
-	parsed, _ := reference.ParseDockerRef(image)
-	domain := reference.Domain(parsed)
-	path := reference.Path(parsed)
-	tag := strings.Split(parsed.String(), ":")[1]
+	containerImage := utils.ParseImageRef(image)
 	tracked := false
-	if _, foundInConfig := repoWithRegistryMap[domain]; foundInConfig {
+	if _, foundInConfig := repoWithRegistryMap[containerImage.Domain]; foundInConfig {
 		tracked = true
 	}
 
@@ -69,13 +45,8 @@ func createTrackedContainer(name string, image string, include string, transform
 			Include:   include,
 			Transform: transform,
 		},
-		Image: ContainerImage{
-			Path:   path,
-			Tag:    tag,
-			Domain: domain,
-		},
+		Image: containerImage,
 	}
-
 }
 
 func getTrackedContainer(container Container, repoWithRegistryMap DomainConfiguredRegistryMap) TrackedContainer {
