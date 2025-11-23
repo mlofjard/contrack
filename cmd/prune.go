@@ -86,7 +86,8 @@ func NewPruneCommand(rootViper *viper.Viper, renderer *glamour.TermRenderer) *co
 	// pruneCmd represents the prune command
 	var pruneCmd = &cobra.Command{
 		Use:     "prune <manifest file>",
-		Short:   "A brief description of your command",
+		Aliases: aliases("prune", "p"),
+		Short:   "Remove old digest tags from registry",
 		Long:    help.Long,
 		Example: help.Example,
 		Args:    cobra.ExactArgs(1),
@@ -96,6 +97,7 @@ func NewPruneCommand(rootViper *viper.Viper, renderer *glamour.TermRenderer) *co
 			fmt.Println("cutoff", time.Now().Add(-time.Duration(longDuration)))
 		},
 	}
+	removeUsageAlias(pruneCmd)
 
 	// Setup flags
 

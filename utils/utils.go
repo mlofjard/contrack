@@ -20,16 +20,37 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/charmbracelet/glamour"
 	"github.com/distribution/reference"
+	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 
 	. "github.com/mlofjard/contrack/types"
 )
 
+type multiValueFlags []string
+
 var renderer *glamour.TermRenderer
 
+func (i multiValueFlags) Has(s string) bool {
+	all := slices.Contains(i, "all")
+	if all {
+		return true
+	}
+	return slices.Contains(i, s)
+}
+
+func ReadMockFlag(flagSet *pflag.FlagSet) multiValueFlags {
+	var mockFlags multiValueFlags
+
+	mockFlags, err := flagSet.GetStringSlice("mock")
+	cobra.CheckErr(err)
+
+	return mockFlags
+}
 func HandleErr(err interface{}) {
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "ERROR:", err)

@@ -17,19 +17,23 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 package cmd
 
 import (
+	_ "embed"
 	"fmt"
 
 	"github.com/charmbracelet/glamour"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
-	"github.com/mlofjard/contrack/command"
 	"github.com/mlofjard/contrack/configuration"
 	"github.com/mlofjard/contrack/containers"
 	"github.com/mlofjard/contrack/mocks"
 	"github.com/mlofjard/contrack/registry"
 	. "github.com/mlofjard/contrack/types"
+	"github.com/mlofjard/contrack/utils"
 )
+
+//go:embed track.md
+var trackMarkdown string
 
 func toggleMock[K ConfigFileReaderFn | ContainerDiscoveryFn | RegistryTagFetcherFn](has bool, mockFn K, realFn K) K {
 	if has {
@@ -39,12 +43,17 @@ func toggleMock[K ConfigFileReaderFn | ContainerDiscoveryFn | RegistryTagFetcher
 }
 
 func NewTrackCommand(rootViper *viper.Viper, renderer *glamour.TermRenderer) *cobra.Command {
+	help := utils.ParseHelp(renderer, trackMarkdown)
+
 	var trackCmd = &cobra.Command{
-		Use:   "track",
-		Short: "Track container image tags to discover new versions",
+		Use:     "track",
+		Aliases: aliases("track", "t"),
+		Short:   "Track container image tags to discover new versions",
+		Long:    help.Long,
+		Example: help.Example,
 		Run: func(cmd *cobra.Command, args []string) {
 			// Setup and parse command flags
-			mockFlags := command.SetupCommandline(cmd.Flags())
+			mockFlags := utils.ReadMockFlag(cmd.Flags())
 			configFileReaderFn := toggleMock(mockFlags.Has("config"), mocks.ConfigFileReaderFunc, configuration.FileReaderFunc)
 			containerDiscoveryFn := toggleMock(mockFlags.Has("containers"), mocks.ContainerDiscoveryFunc, containers.DiscoveryFunc)
 			registryTagFetcherFn := toggleMock(mockFlags.Has("registry"), mocks.RegistryTagFetcherFunc, registry.TagFetcherFunc)
@@ -70,6 +79,7 @@ func NewTrackCommand(rootViper *viper.Viper, renderer *glamour.TermRenderer) *co
 			containers.ProcessTrackedContainers(config, imageTagMap, trackedContainers)
 		},
 	}
+	removeUsageAlias(trackCmd)
 
 	// Setup flags
 	trackCmd.Flags().StringSlice("mock", nil, "")

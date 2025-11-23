@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 
 	"github.com/charmbracelet/glamour"
 	"github.com/muesli/termenv"
@@ -37,6 +38,25 @@ var helpStyle string
 var rootMarkdown string
 
 var cfgFile string
+
+var removeAliasRegex = regexp.MustCompile("\\{\\{if gt \\(len \\.Aliases\\) 0\\}\\}\\n\\n.*\\n.*\\{\\{end\\}\\}")
+
+func aliases(full string, smallest string) []string {
+	num := len(full) - len(smallest)
+	result := make([]string, num)
+
+	for i := range num {
+		result[i] = full[:i+1]
+	}
+
+	return result
+}
+
+func removeUsageAlias(cmd *cobra.Command) {
+	oldTemplate := cmd.UsageTemplate()
+	newTemplate := removeAliasRegex.ReplaceAllString(oldTemplate, "")
+	cmd.SetUsageTemplate(newTemplate)
+}
 
 func NewRootCommand(rootViper *viper.Viper, renderer *glamour.TermRenderer) *cobra.Command {
 	help := utils.ParseHelp(renderer, rootMarkdown)
@@ -66,6 +86,7 @@ func NewRootCommand(rootViper *viper.Viper, renderer *glamour.TermRenderer) *cob
 }
 
 func Execute() {
+	aliases("hejsan", "h")
 	rootViper := viper.New()
 
 	renderer, err := glamour.NewTermRenderer(
